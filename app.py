@@ -94,17 +94,29 @@ def render_sidebar() -> None:
                 _open_chat(c["id"])
                 st.rerun()
 
+        st.markdown("<hr style='margin:16px 0;border:none;border-top:1px solid "
+                    "#dbc1b8'>", unsafe_allow_html=True)
+        with st.expander("🔊  Voice"):
+            voice.voice_settings()
+
 
 # --- Main: new-chat empty state ---------------------------------------------
 
 def render_new_chat() -> None:
     st.markdown(
-        "<h1 style='text-align:center;font-size:56px;margin:8vh 0 4vh'>"
-        "How can I help?</h1>", unsafe_allow_html=True)
+        "<h1 style='text-align:center;font-size:56px;margin:7vh 0 1vh'>"
+        "How can I help?</h1>"
+        "<p style='text-align:center;color:#55433c;font-size:18px;margin-bottom:4vh'>"
+        "Ask me anything while you cook — tap the mic or type below.</p>",
+        unsafe_allow_html=True)
 
-    spoken = voice.listen(key="mic_new")
-    if spoken:
-        ask(spoken)
+    mid = st.columns([1, 3, 1])[1]
+    with mid:
+        spoken = voice.listen(key="mic_new")
+        if spoken:
+            ask(spoken)
+        st.markdown("<p class='sc-eyebrow' style='text-align:center;margin-top:6px'>"
+                    "or type it</p>", unsafe_allow_html=True)
 
     typed = st.chat_input("Ask Su Chef anything… (e.g. “out of buttermilk — what now?”)")
     if typed:

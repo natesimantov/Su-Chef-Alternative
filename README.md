@@ -34,11 +34,12 @@ Without a key the app still runs, answering from a small built-in knowledge base
 
 ```
 app.py          # the whole UI: one prompt, chats, sidebar (recent + pinned)
-companion.py    # answer(messages) -> str via Claude (claude-haiku-4-5) + offline fallback
+companion.py    # answer(messages) -> str via Claude (claude-sonnet-4-6) + offline fallback
 voice.py        # tap-to-speak mic (in) + browser read-aloud (out)
 storage.py      # local JSON persistence for chats and pins (data/, gitignored)
 theme.py        # Warm Hearth design system (CSS)
 ```
 
-The model is configurable via `SU_CHEF_MODEL` (defaults to `claude-haiku-4-5`;
-bump to `claude-sonnet-4-6` for richer answers).
+The model is configurable via `SU_CHEF_MODEL` (defaults to `claude-sonnet-4-6`;
+drop to `claude-haiku-4-5` for faster, cheaper answers). The read-aloud voice and
+speed are adjustable in the sidebar's **🔊 Voice** panel.

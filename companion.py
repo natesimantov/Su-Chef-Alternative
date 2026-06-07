@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import os
 
-MODEL = os.environ.get("SU_CHEF_MODEL", "claude-haiku-4-5")
+MODEL = os.environ.get("SU_CHEF_MODEL", "claude-sonnet-4-6")
 
 SYSTEM_PROMPT = (
     "You are Su Chef, an expert cooking companion with deep culinary and "
