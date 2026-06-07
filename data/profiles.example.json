@@ -1,0 +1,7 @@
+{
+  "profiles": [
+    { "name": "My wife", "notes": "no garlic, light dishes, no shellfish" },
+    { "name": "My kids", "notes": "no spicy food, love pasta, one lactose intolerant" },
+    { "name": "Guest", "notes": "vegetarian, nut allergy" }
+  ]
+}

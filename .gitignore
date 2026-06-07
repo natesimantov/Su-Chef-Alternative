@@ -1,3 +1,15 @@
 .agents/
 .claude/
 skills-lock.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+
+# Runtime user data — everything except the committed example
+data/*
+!data/profiles.example.json
+_stitch_extract/

@@ -1,0 +1,12 @@
+# Warm Hearth palette at the Streamlit level, so built-in widgets (selectbox,
+# radio, chat input, spinner, checkboxes) adopt the brand colors too. The richer
+# styling still comes from ui/theme.py.
+[theme]
+base = "light"
+primaryColor = "#944521"
+backgroundColor = "#fcf9f8"
+secondaryBackgroundColor = "#f0eded"
+textColor = "#1b1c1c"
+
+[server]
+runOnSave = true
