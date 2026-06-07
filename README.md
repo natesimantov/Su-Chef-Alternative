@@ -1,46 +1,44 @@
 # Su Chef
 
-An AI cooking companion for home cooks — it shapes a recipe *with* you, guides you
-hands-free while you cook, adapts when things go sideways, and keeps your family's
-dietary needs safe. See the product definition and proposal in `AI FINAL PROJECT/`.
+A knowledgeable chef in your pocket. One prompt — **"How can I help?"** — and you
+ask anything mid-cook, by voice (a big tap-to-speak mic for messy hands) or by
+typing. Su Chef gives a fast, grounded answer from real culinary and food-science
+knowledge, shown on screen **and read aloud**.
 
-## Status
+- **No setup, no recipe walkthrough.** Just ask. State what you're making inside
+  the question ("I'm making apple pie but I'm out of baking soda — what now?").
+- **Every question is its own chat**, logged separately like a ChatGPT session.
+  The **"Ask a follow-up"** button continues the thread.
+- **Pin answers** (a recipe, a conversion, an instruction) with ★ to keep them in
+  the sidebar for later.
+- Recent chats and pins live in the **sidebar** and persist across restarts.
 
-Early scaffold. The recipe **contract** and the Streamlit **UI shell** are in place;
-the DEFINE and COOK screens are a first-pass port of the Stitch mockups, driven by
-mock data. The CrewAI crew, RAG, and tools are not built yet.
-
-## Run the UI
+## Run
 
 ```bash
 pip install -r requirements.txt
-streamlit run ui/app.py
+streamlit run app.py
 ```
 
-Use the **Dev navigation** in the sidebar to jump between screens, or type a dish /
-tap a suggestion on DEFINE to walk into COOK mode.
+Add your Anthropic API key so answers are chef-grade. Create
+`.streamlit/secrets.toml` (gitignored):
+
+```toml
+ANTHROPIC_API_KEY = "sk-ant-..."
+```
+
+Without a key the app still runs, answering from a small built-in knowledge base
+(clearly marked as limited).
 
 ## Layout
 
 ```
-shared/models.py     # the recipe contract — the one file the team codes against
-ui/
-  app.py             # Streamlit entry + session state + dev nav
-  theme.py           # Warm Hearth design system, ported to CSS
-  sample_data.py     # mock recipe + profiles (until the crew produces real ones)
-  screens/           # define, cook (more to come: debate, prep, done, people)
-data/
-  profiles.example.json   # documents the profile shape; real data/ is gitignored
-agents/              # CrewAI crew (not built yet)
-tools/               # culinary-math, allergen-check, profile_store, ... (not built yet)
+app.py          # the whole UI: one prompt, chats, sidebar (recent + pinned)
+companion.py    # answer(messages) -> str via Claude (claude-haiku-4-5) + offline fallback
+voice.py        # tap-to-speak mic (in) + browser read-aloud (out)
+storage.py      # local JSON persistence for chats and pins (data/, gitignored)
+theme.py        # Warm Hearth design system (CSS)
 ```
 
-## Notes
-
-- **Design source:** `AI FINAL PROJECT/stitch_su_chef_ai_companion.zip` — 11 screens
-  (HTML/Tailwind) plus the Warm Hearth design system. Tokens are ported in
-  `ui/theme.py`; the mockups don't drop into Streamlit natively, so screens are
-  rebuilt with Streamlit widgets + injected CSS.
-- **Open decision:** the product-definition MD specifies 6 agents, the proposal PDF
-  specifies 5 — reconcile before building `agents/`. The recipe contract itself is
-  unaffected.
+The model is configurable via `SU_CHEF_MODEL` (defaults to `claude-haiku-4-5`;
+bump to `claude-sonnet-4-6` for richer answers).

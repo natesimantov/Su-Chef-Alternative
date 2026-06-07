@@ -9,7 +9,10 @@ __pycache__/
 venv/
 .env
 
-# Runtime user data — everything except the committed example
-data/*
-!data/profiles.example.json
+# Runtime user data (chats + pins) — personal, never committed
+data/
+
+# Secrets
+.streamlit/secrets.toml
+
 _stitch_extract/
