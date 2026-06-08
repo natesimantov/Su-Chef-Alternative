@@ -27,13 +27,17 @@ import streamlit.components.v1 as components
 # then by preferred (natural) voice names, then fall back gracefully.
 _VOICE_JS = """
 const SC_ACCENTS = {
-  auto: {lang:'en',    names:['Natural','Online','Google US','Google UK','Aria','Jenny','Samantha']},
-  fr_f: {lang:'fr',    names:['Denise','Amelie','Audrey','Virginie','Natural','Online','Google']},
-  fr_m: {lang:'fr',    names:['Henri','Paul','Claude','Natural','Online','Google']},
-  it_f: {lang:'it',    names:['Elsa','Alice','Isabella','Natural','Online','Google']},
-  it_m: {lang:'it',    names:['Diego','Cosimo','Giuseppe','Natural','Online','Google']},
-  us_f: {lang:'en-us', names:['Aria','Jenny','Michelle','Ana','Samantha','Natural','Online']},
-  us_m: {lang:'en-us', names:['Guy','Davis','Tony','Mark','Natural','Online']}
+  auto:   {lang:'en',    names:['Natural','Online','Google US','Google UK','Aria','Jenny','Samantha']},
+  alan:   {lang:'en-gb', names:['Ryan','George','Thomas','Natural','Online','Google UK English Male']},
+  emma:   {lang:'en-gb', names:['Sonia','Libby','Hazel','Natural','Online','Google UK English Female']},
+  thomas: {lang:'en-us', names:['Guy','Davis','Andrew','Tony','Eric','Natural','Online']},
+  mia:    {lang:'en-us', names:['Aria','Jenny','Michelle','Ana','Samantha','Natural','Online']},
+  liam:   {lang:'en-ie', names:['Connor','Natural','Online']},
+  erin:   {lang:'en-ie', names:['Emily','Natural','Online']},
+  jack:   {lang:'en-au', names:['William','Ken','Natural','Online']},
+  chloe:  {lang:'en-au', names:['Natasha','Freya','Natural','Online']},
+  arjun:  {lang:'en-in', names:['Prabhat','Natural','Online']},
+  priya:  {lang:'en-in', names:['Neerja','Natural','Online']}
 };
 function scProfile(){ return SC_ACCENTS[localStorage.getItem('su_chef_accent') || 'auto'] || SC_ACCENTS.auto; }
 function scNorm(l){ return (l||'').toLowerCase().replace('_','-'); }
@@ -118,23 +122,36 @@ _SETTINGS_HTML = """
   .sc-using { font-size:12px; color:#56642b; font-weight:600; margin:2px 0 10px; }
 </style>
 <div class="sc-vs">
-  <label>Accent</label>
+  <label>Voice</label>
   <select id="sc-accent" onchange="scSave()">
     <option value="auto">Auto — most natural</option>
-    <option value="fr_f">French accent — female</option>
-    <option value="fr_m">French accent — male</option>
-    <option value="it_f">Italian accent — female</option>
-    <option value="it_m">Italian accent — male</option>
-    <option value="us_f">Southern US* — female</option>
-    <option value="us_m">Southern US* — male</option>
+    <optgroup label="Free voices">
+      <option value="alan">Alan · British</option>
+      <option value="emma">Emma · British</option>
+      <option value="thomas">Thomas · American</option>
+      <option value="mia">Mia · American</option>
+      <option value="liam">Liam · Irish</option>
+      <option value="erin">Erin · Irish</option>
+      <option value="jack">Jack · Australian</option>
+      <option value="chloe">Chloe · Australian</option>
+      <option value="arjun">Arjun · Indian</option>
+      <option value="priya">Priya · Indian</option>
+    </optgroup>
+    <optgroup label="Premium — coming soon">
+      <option disabled>Gabrielle · French</option>
+      <option disabled>Hugo · French</option>
+      <option disabled>Lucia · Italian</option>
+      <option disabled>Marco · Italian</option>
+      <option disabled>Belle · Southern US</option>
+      <option disabled>Wyatt · Southern US</option>
+    </optgroup>
   </select>
   <div class="sc-using" id="sc-using"></div>
   <label>Speed: <span id="sc-rate-label"></span></label>
   <input id="sc-rate" type="range" min="0.7" max="1.3" step="0.05" oninput="scSaveRate()">
   <button onclick="scTest()">▶  Test voice</button>
-  <p class="sc-note">*Southern US uses a natural US voice for now — a true Southern
-  drawl comes with premium voices later.<br>Tip: open in <b>Microsoft Edge</b> for
-  the most natural French/Italian voices.</p>
+  <p class="sc-note">Premium voices (French, Italian, Southern US) coming soon.<br>
+  Tip: open in <b>Microsoft Edge</b> while online for the most natural voices.</p>
 </div>
 <script>
 /*VOICE_JS*/
@@ -157,7 +174,7 @@ function scSaveRate(){
 }
 function scTest(){
   localStorage.setItem('su_chef_accent', acc.value);
-  scSpeak("Ciao! This is how I'll read your answers. Let's get cooking.");
+  scSpeak("Hi, I'm Su Chef. This is how I'll read your answers. Let's get cooking!");
 }
 showUsing();
 window.speechSynthesis.addEventListener('voiceschanged', showUsing);

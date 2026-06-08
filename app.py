@@ -36,8 +36,8 @@ def _open_chat(chat_id: str) -> None:
 
 
 def ask(question: str) -> None:
-    """Process a question: start or continue the active chat, get an answer,
-    persist it, and queue it to be read aloud."""
+    """Process a question: start or continue the active chat, get a structured
+    answer, persist it, and queue it to be read aloud."""
     question = (question or "").strip()
     if not question:
         return
@@ -47,10 +47,36 @@ def ask(question: str) -> None:
                 "created_at": storage._now(), "messages": []}
     chat["messages"].append({"role": "user", "content": question})
     reply = companion.answer(chat["messages"])
-    chat["messages"].append({"role": "assistant", "content": reply})
+    chat["messages"].append(_assistant_msg(reply))
+    _finish(chat, reply["answer"])
+
+
+def regenerate(chat: dict, idx: int, corrected_context: str) -> None:
+    """Re-answer the assistant turn at `idx` using the cook's corrected context.
+    Truncates anything after it (editing rewrites the thread from that point)."""
+    convo = [{"role": m["role"], "content": m["content"]} for m in chat["messages"][:idx]]
+    convo.append({"role": "user",
+                  "content": f"(Quick context correction: {corrected_context}.) "
+                             "Please answer again with this in mind."})
+    reply = companion.answer(convo)
+    new_msg = _assistant_msg(reply)
+    if corrected_context.strip():
+        new_msg["context"] = corrected_context.strip()
+    chat["messages"] = chat["messages"][:idx] + [new_msg]
+    st.session_state.pop("edit_context", None)
+    _finish(chat, reply["answer"])
+
+
+def _assistant_msg(reply: dict) -> dict:
+    return {"role": "assistant", "content": reply["answer"],
+            "context": reply.get("context", ""),
+            "follow_ups": reply.get("follow_ups", [])}
+
+
+def _finish(chat: dict, spoken: str) -> None:
     storage.save_chat(chat)
     st.session_state["active_chat"] = chat
-    st.session_state["pending_speak"] = reply
+    st.session_state["pending_speak"] = spoken
     st.session_state["followup_open"] = False
     st.rerun()
 
@@ -73,7 +99,7 @@ def render_sidebar() -> None:
                 c1, c2 = st.columns([5, 1])
                 with c1:
                     snippet = p["text"][:70] + ("…" if len(p["text"]) > 70 else "")
-                    if st.button(f"★ {snippet}", key=f"pin_{p['id']}",
+                    if st.button(f"📌 {snippet}", key=f"pin_{p['id']}",
                                  use_container_width=True):
                         _open_chat(p["chat_id"])
                         st.rerun()
@@ -144,9 +170,7 @@ def render_chat(chat: dict) -> None:
             st.markdown(f"<p class='sc-question'>🎙️ “{m['content']}”</p>",
                         unsafe_allow_html=True)
         else:
-            st.markdown(f"<div class='sc-answer'>{m['content']}</div>",
-                        unsafe_allow_html=True)
-            _answer_controls(chat, i, is_last=(i == last_assistant))
+            _render_answer(chat, i, is_last=(i == last_assistant))
 
     if st.session_state.get("followup_open"):
         st.markdown("<p class='sc-eyebrow' style='margin-top:18px'>Continue this "
@@ -159,21 +183,50 @@ def render_chat(chat: dict) -> None:
             ask(typed)
 
 
-def _answer_controls(chat: dict, idx: int, is_last: bool) -> None:
-    text = chat["messages"][idx]["content"]
+def _render_answer(chat: dict, idx: int, is_last: bool) -> None:
+    cid = chat["id"]
+    m = chat["messages"][idx]
+    text = m["content"]
+    ctx = m.get("context", "")
     question = chat["messages"][idx - 1]["content"] if idx > 0 else ""
-    cols = st.columns([3, 1, 1, 3])
 
-    if is_last:
-        with cols[0]:
-            if st.button("↩  Ask a follow-up", key=f"fu_{chat['id']}_{idx}",
-                         type="primary", use_container_width=True):
-                st.session_state["followup_open"] = True
+    # 1) Context line ("Sounds like you're making…") with an edit ✎ on the latest.
+    if st.session_state.get("edit_context") == idx:
+        new_ctx = st.text_input("Correct what I understood", value=ctx,
+                                key=f"ctxin_{cid}_{idx}")
+        b1, b2, _ = st.columns([1, 1, 5])
+        with b1:
+            if st.button("Save", key=f"ctxsave_{cid}_{idx}", type="primary",
+                         use_container_width=True):
+                regenerate(chat, idx, new_ctx)
+        with b2:
+            if st.button("Cancel", key=f"ctxcancel_{cid}_{idx}",
+                         use_container_width=True):
+                st.session_state.pop("edit_context", None)
                 st.rerun()
+    elif ctx:
+        if is_last:
+            c1, c2 = st.columns([11, 1])
+            with c1:
+                st.markdown(f"<p class='sc-context'><i>{ctx}</i></p>",
+                            unsafe_allow_html=True)
+            with c2:
+                if st.button("✎", key=f"ctxedit_{cid}_{idx}",
+                             help="Correct what I understood"):
+                    st.session_state["edit_context"] = idx
+                    st.rerun()
+        else:
+            st.markdown(f"<p class='sc-context'><i>{ctx}</i></p>",
+                        unsafe_allow_html=True)
 
-    with cols[1]:
+    # 2) Answer card + pin (top-right) and a big read-aloud button on the right.
+    acol, rcol = st.columns([5, 1])
+    with acol:
+        st.markdown(f"<div class='sc-answer'>{text}</div>", unsafe_allow_html=True)
+    with rcol:
         pinned = storage.is_pinned(text)
-        if st.button("★" if pinned else "☆", key=f"pintoggle_{chat['id']}_{idx}",
+        if st.button("📌", key=f"pintoggle_{cid}_{idx}",
+                     type="primary" if pinned else "secondary",
                      help="Unpin" if pinned else "Pin this answer",
                      use_container_width=True):
             if pinned:
@@ -181,10 +234,23 @@ def _answer_controls(chat: dict, idx: int, is_last: bool) -> None:
                 if pid:
                     storage.remove_pin(pid)
             else:
-                storage.add_pin(text, question, chat["id"])
+                storage.add_pin(text, question, cid)
             st.rerun()
-    with cols[2]:
-        voice.speak_button(text, key=f"say_{chat['id']}_{idx}")
+        if st.button("🔊", key=f"say_{cid}_{idx}", help="Read aloud",
+                     use_container_width=True):
+            voice.speak(text)
+
+    if not is_last:
+        return
+
+    # 3) Suggested follow-ups (Gmail-style), then the custom follow-up composer.
+    for j, fu in enumerate(m.get("follow_ups", [])):
+        if st.button(fu, key=f"sugg_{cid}_{idx}_{j}", use_container_width=True):
+            ask(fu)
+    if st.button("↩  Ask a different follow-up", key=f"fu_{cid}_{idx}",
+                 type="primary", use_container_width=True):
+        st.session_state["followup_open"] = True
+        st.rerun()
 
 
 def main() -> None:

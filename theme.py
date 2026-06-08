@@ -108,6 +108,27 @@ h1, h2, h3, .sc-display {{
   background: var(--sc-secondary_container, #d6e7a1); color: #3e4c16;
   border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 15px;
 }}
+
+/* Context-understanding line above each answer */
+.sc-context {{
+  color: #7a6a63; font-style: italic; font-size: 16px; margin: 8px 0 6px;
+}}
+
+/* Big read-aloud button (keyed say_) on the right of the answer */
+[class*="st-key-say_"] button {{
+  min-height: 64px !important; font-size: 26px !important; padding: 0 !important;
+  background: var(--sc-card) !important; border: 1px solid var(--sc-primary) !important;
+}}
+/* Compact pin + edit buttons */
+[class*="st-key-pintoggle_"] button {{ min-height: 42px !important; font-size: 20px !important; padding: 0 !important; }}
+[class*="st-key-ctxedit_"] button {{ min-height: 38px !important; padding: 0 !important; }}
+
+/* Suggested follow-up chips (Gmail Smart-Reply style, light gray) */
+[class*="st-key-sugg_"] button {{
+  background: #f6f3f2 !important; color: #55433c !important; font-weight: 500 !important;
+  border: 1px solid #e4e2e1 !important; text-align: left !important;
+  justify-content: flex-start !important; min-height: 44px !important;
+}}
 </style>
 """
 
