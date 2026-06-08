@@ -10,12 +10,26 @@ Run:  streamlit run app.py
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import streamlit as st
 
 import companion
 import storage
+import theme
 import voice
 from theme import inject_theme
+
+
+@contextmanager
+def _thinking():
+    """Show the bobbing-toque loader while a (blocking) answer is generated."""
+    ph = st.empty()
+    ph.markdown(theme.loader_html(), unsafe_allow_html=True)
+    try:
+        yield
+    finally:
+        ph.empty()
 
 
 def _init_state() -> None:
@@ -46,7 +60,8 @@ def ask(question: str) -> None:
         chat = {"id": storage.new_id(), "title": storage.title_from(question),
                 "created_at": storage._now(), "messages": []}
     chat["messages"].append({"role": "user", "content": question})
-    reply = companion.answer(chat["messages"])
+    with _thinking():
+        reply = companion.answer(chat["messages"])
     chat["messages"].append(_assistant_msg(reply))
     _finish(chat, reply["answer"])
 
@@ -58,7 +73,8 @@ def regenerate(chat: dict, idx: int, corrected_context: str) -> None:
     convo.append({"role": "user",
                   "content": f"(Quick context correction: {corrected_context}.) "
                              "Please answer again with this in mind."})
-    reply = companion.answer(convo)
+    with _thinking():
+        reply = companion.answer(convo)
     new_msg = _assistant_msg(reply)
     if corrected_context.strip():
         new_msg["context"] = corrected_context.strip()

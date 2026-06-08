@@ -136,8 +136,42 @@ h1, h2, h3, .sc-display {{
   border: 1px solid #e4e2e1 !important; text-align: left !important;
   justify-content: flex-start !important; min-height: 44px !important;
 }}
+
+/* "Su Chef is thinking…" loader — a gently bobbing chef's toque */
+.sc-loader {{ display: flex; flex-direction: column; align-items: center;
+  gap: 10px; padding: 22px 0; }}
+.sc-loader svg {{ animation: sc-bob 1.1s ease-in-out infinite; }}
+@keyframes sc-bob {{ 0%, 100% {{ transform: translateY(0); }}
+  50% {{ transform: translateY(-9px); }} }}
+.sc-loading-text {{ color: var(--sc-primary); font-weight: 600; font-size: 18px; }}
+.sc-dots span {{ animation: sc-blink 1.2s infinite both; }}
+.sc-dots span:nth-child(2) {{ animation-delay: .2s; }}
+.sc-dots span:nth-child(3) {{ animation-delay: .4s; }}
+@keyframes sc-blink {{ 0%, 80%, 100% {{ opacity: .2; }} 40% {{ opacity: 1; }} }}
 </style>
 """
+
+# A self-contained chef's-toque loader (Warm Hearth terracotta, no assets).
+_TOQUE = (
+    "<svg width='72' height='72' viewBox='0 0 84 84'>"
+    "<path fill='#944521' d='M28 62 L28 50 C18 50 12 42 12 33 C12 24 19 18 27 18 "
+    "C29 11 35 7 42 7 C49 7 55 11 57 18 C65 18 72 24 72 33 C72 42 66 50 56 50 "
+    "L56 62 C56 63 55 64 54 64 L30 64 C29 64 28 63 28 62 Z'/>"
+    "<line x1='28' y1='51' x2='56' y2='51' stroke='#fcf9f8' stroke-width='2.5'/>"
+    "<line x1='38' y1='51' x2='38' y2='64' stroke='#fcf9f8' stroke-width='2.5'/>"
+    "<line x1='48' y1='51' x2='48' y2='64' stroke='#fcf9f8' stroke-width='2.5'/>"
+    "</svg>"
+)
+
+
+def loader_html(message: str = "Su Chef is thinking") -> str:
+    """HTML for the bobbing-toque 'thinking' loader."""
+    return (
+        f"<div class='sc-loader'>{_TOQUE}"
+        f"<div class='sc-loading-text'>{message}"
+        "<span class='sc-dots'><span>.</span><span>.</span><span>.</span></span>"
+        "</div></div>"
+    )
 
 
 def inject_theme() -> None:
