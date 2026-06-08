@@ -153,6 +153,20 @@ button[kind="segmented_controlActive"] {{ background: var(--sc-primary) !importa
 [class*="st-key-pintoggle_"] button {{ min-height: 42px !important; font-size: 20px !important; padding: 0 !important; }}
 [class*="st-key-ctxedit_"] button {{ min-height: 38px !important; padding: 0 !important; }}
 
+/* Sidebar recent-chat + pinned titles: left-align and truncate with an ellipsis
+   so long titles never spill past the pill or under the ✎/✕ buttons. */
+[class*="st-key-chat_"] button, [class*="st-key-pin_"] button {{
+  justify-content: flex-start !important; text-align: left !important; }}
+[class*="st-key-chat_"] button [data-testid="stMarkdownContainer"],
+[class*="st-key-pin_"] button [data-testid="stMarkdownContainer"] {{
+  width: 100%; min-width: 0; }}
+[class*="st-key-chat_"] button p, [class*="st-key-pin_"] button p {{
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: block; width: 100%; }}
+
+/* Hide Streamlit's "Press Enter to submit form" input hint everywhere. */
+[data-testid="InputInstructions"] {{ display: none !important; }}
+
 /* Suggested follow-up chips */
 [class*="st-key-sugg_"] button {{ background: var(--sc-sugg-bg) !important;
   color: var(--sc-text-variant) !important; font-weight: 500 !important;
@@ -164,10 +178,16 @@ button[kind="segmented_controlActive"] {{ background: var(--sc-primary) !importa
 .sc-pin {{ background: var(--sc-secondary-container); color: var(--sc-on-secondary-container);
   border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 15px; }}
 
-/* "Su Chef is thinking…" loader */
-.sc-loader {{ display: flex; flex-direction: column; align-items: center;
-  gap: 10px; padding: 22px 0; }}
-.sc-loader svg {{ animation: sc-bob 1.1s ease-in-out infinite; }}
+/* "Su Chef is thinking…" loader — a full-screen floating overlay that dims +
+   blurs the page behind it while the answer is generated. */
+.sc-loader-overlay {{ position: fixed; inset: 0; z-index: 100000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10, 7, 4, 0.55); backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px); }}
+.sc-loader-panel {{ display: flex; flex-direction: column; align-items: center;
+  gap: 14px; background: var(--sc-card); border: 1px solid var(--sc-outline);
+  border-radius: 20px; padding: 30px 40px; box-shadow: 0 14px 44px rgba(0,0,0,.4); }}
+.sc-loader-panel svg {{ animation: sc-bob 1.1s ease-in-out infinite; }}
 @keyframes sc-bob {{ 0%, 100% {{ transform: translateY(0); }} 50% {{ transform: translateY(-9px); }} }}
 .sc-loading-text {{ color: var(--sc-primary); font-weight: 600; font-size: 18px; }}
 .sc-dots span {{ animation: sc-blink 1.2s infinite both; }}
@@ -177,7 +197,7 @@ button[kind="segmented_controlActive"] {{ background: var(--sc-primary) !importa
 
 /* Respect reduced-motion */
 @media (prefers-reduced-motion: reduce) {{
-  *, .sc-loader svg, .sc-dots span {{ animation: none !important; transition: none !important; }}
+  *, .sc-loader-panel svg, .sc-dots span {{ animation: none !important; transition: none !important; }}
 }}
 </style>
 """
@@ -197,10 +217,11 @@ def loader_html(message: str = "Su Chef is thinking") -> str:
         "</svg>"
     )
     return (
-        f"<div class='sc-loader'>{toque}"
+        "<div class='sc-loader-overlay' role='status' aria-live='polite' aria-busy='true'>"
+        f"<div class='sc-loader-panel'>{toque}"
         f"<div class='sc-loading-text'>{message}"
         "<span class='sc-dots'><span>.</span><span>.</span><span>.</span></span>"
-        "</div></div>"
+        "</div></div></div>"
     )
 
 

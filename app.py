@@ -197,7 +197,7 @@ def render_sidebar() -> None:
 def render_new_chat() -> None:
     st.markdown(
         "<h1 style='text-align:center;font-size:56px;margin:7vh 0 1vh'>"
-        "How can I help?</h1>"
+        "Let me help.</h1>"
         "<p style='text-align:center;color:#55433c;font-size:18px;margin-bottom:4vh'>"
         "Ask me anything while you cook!</p>",
         unsafe_allow_html=True)
