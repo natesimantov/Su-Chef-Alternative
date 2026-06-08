@@ -67,6 +67,17 @@ def delete_chat(chat_id: str) -> None:
     _write(_CHATS, [c for c in _read(_CHATS) if c.get("id") != chat_id])
 
 
+def rename_chat(chat_id: str, title: str) -> None:
+    title = title.strip()
+    if not title:
+        return
+    chats = _read(_CHATS)
+    for c in chats:
+        if c.get("id") == chat_id:
+            c["title"] = title
+    _write(_CHATS, chats)
+
+
 # --- Pins --------------------------------------------------------------------
 
 def load_pins() -> list[dict]:

@@ -39,6 +39,7 @@ def _init_state() -> None:
     st.session_state.setdefault("followup_open", False)
     st.session_state.setdefault("pending_speak", None)
     st.session_state.setdefault("theme_ctrl", theme.DEFAULT_THEME)
+    st.session_state.setdefault("units_ctrl", "Metric °C")
 
 
 def _new_chat() -> None:
@@ -149,10 +150,41 @@ def render_sidebar() -> None:
             st.caption("Your questions will show up here.")
         active_id = (st.session_state.get("active_chat") or {}).get("id")
         for c in chats:
-            label = ("• " if c["id"] == active_id else "") + c["title"]
-            if st.button(label, key=f"chat_{c['id']}", use_container_width=True):
-                _open_chat(c["id"])
-                st.rerun()
+            cid = c["id"]
+            if st.session_state.get("rename_chat") == cid:
+                new = st.text_input("Rename", value=c["title"], key=f"rn_{cid}",
+                                    label_visibility="collapsed")
+                rc1, rc2 = st.columns(2)
+                with rc1:
+                    if st.button("Save", key=f"rnsave_{cid}", type="primary",
+                                 use_container_width=True):
+                        storage.rename_chat(cid, new)
+                        if active_id == cid:
+                            _open_chat(cid)
+                        st.session_state.pop("rename_chat", None)
+                        st.rerun()
+                with rc2:
+                    if st.button("Cancel", key=f"rncancel_{cid}",
+                                 use_container_width=True):
+                        st.session_state.pop("rename_chat", None)
+                        st.rerun()
+                continue
+            col, b1, b2 = st.columns([5, 1, 1])
+            with col:
+                label = ("• " if cid == active_id else "") + c["title"]
+                if st.button(label, key=f"chat_{cid}", use_container_width=True):
+                    _open_chat(cid)
+                    st.rerun()
+            with b1:
+                if st.button("✎", key=f"chrn_{cid}", help="Rename"):
+                    st.session_state["rename_chat"] = cid
+                    st.rerun()
+            with b2:
+                if st.button("✕", key=f"chdel_{cid}", help="Delete"):
+                    storage.delete_chat(cid)
+                    if active_id == cid:
+                        st.session_state["active_chat"] = None
+                    st.rerun()
 
         st.markdown("<hr style='margin:16px 0;border:none;border-top:1px solid "
                     "#dbc1b8'>", unsafe_allow_html=True)
@@ -301,7 +333,7 @@ def _top_controls() -> None:
     c1, _, c3 = st.columns([3, 1, 3])
     with c1:
         st.segmented_control(
-            "Units", ["Metric °C", "US °F"], default="Metric °C",
+            "Units", ["Metric °C", "US °F"],
             key="units_ctrl", label_visibility="collapsed")
         st.session_state["units"] = (
             "us" if st.session_state.get("units_ctrl") == "US °F" else "metric")

@@ -19,51 +19,51 @@ import streamlit as st
 THEMES: dict[str, dict] = {
     "Warm Hearth": {
         "surface": "#fcf9f8", "card": "#f0eded", "answer": "#ffffff",
-        "text": "#1b1c1c", "text_variant": "#55433c",
-        "primary": "#944521", "on_primary": "#ffffff",
-        "secondary": "#56642b", "secondary_container": "#d6e7a1",
-        "on_secondary_container": "#5a682f", "outline": "#88726b",
-        "sugg_bg": "#f6f3f2", "sugg_border": "#e4e2e1",
+        "text": "#1b1c1c", "text_variant": "#5b4a42",
+        "primary": "#9a4a23", "on_primary": "#ffffff",
+        "secondary": "#4f5d27", "secondary_container": "#d6e7a1",
+        "on_secondary_container": "#41501f", "outline": "#9c8a82",
+        "sugg_bg": "#f4efed", "sugg_border": "#e3dcd8",
     },
     "Herb Garden": {
-        "surface": "#f3f7f0", "card": "#e6efe1", "answer": "#ffffff",
-        "text": "#1c2a1f", "text_variant": "#3e4c39",
-        "primary": "#3f7d4f", "on_primary": "#ffffff",
-        "secondary": "#b9742f", "secondary_container": "#ead9c4",
-        "on_secondary_container": "#7a4d20", "outline": "#7d8a78",
-        "sugg_bg": "#eef3ea", "sugg_border": "#dce6d5",
+        "surface": "#f2f6ef", "card": "#e4ede0", "answer": "#ffffff",
+        "text": "#19241c", "text_variant": "#3c4a39",
+        "primary": "#2f7344", "on_primary": "#ffffff",
+        "secondary": "#9a5a22", "secondary_container": "#d7e6c4",
+        "on_secondary_container": "#3e4c16", "outline": "#7f8d7b",
+        "sugg_bg": "#edf2ea", "sugg_border": "#d9e2d3",
     },
     "Slate & Citrus": {
-        "surface": "#f4f6f8", "card": "#e7edf2", "answer": "#ffffff",
-        "text": "#1b2733", "text_variant": "#3c4a57",
-        "primary": "#2f5d7c", "on_primary": "#ffffff",
-        "secondary": "#d97e1f", "secondary_container": "#f6e2c4",
-        "on_secondary_container": "#8a5512", "outline": "#7a8794",
-        "sugg_bg": "#eef2f6", "sugg_border": "#dde5ec",
+        "surface": "#f4f6f9", "card": "#e6ecf2", "answer": "#ffffff",
+        "text": "#16202b", "text_variant": "#3a4754",
+        "primary": "#2b5a79", "on_primary": "#ffffff",
+        "secondary": "#b96412", "secondary_container": "#f6e2c4",
+        "on_secondary_container": "#7a4a0f", "outline": "#7a8794",
+        "sugg_bg": "#eef2f7", "sugg_border": "#dbe3eb",
     },
     "Berry": {
-        "surface": "#f9f4f7", "card": "#efe2ec", "answer": "#ffffff",
-        "text": "#2a1c25", "text_variant": "#4d3a45",
-        "primary": "#8a3a64", "on_primary": "#ffffff",
-        "secondary": "#6a8a3a", "secondary_container": "#dbe7c4",
-        "on_secondary_container": "#4d6526", "outline": "#94818c",
-        "sugg_bg": "#f4ebf1", "sugg_border": "#e7d6e1",
+        "surface": "#f9f4f7", "card": "#eee0ea", "answer": "#ffffff",
+        "text": "#271823", "text_variant": "#50394a",
+        "primary": "#8a2f5e", "on_primary": "#ffffff",
+        "secondary": "#5d7a2e", "secondary_container": "#dbe7c4",
+        "on_secondary_container": "#41501f", "outline": "#98818f",
+        "sugg_bg": "#f3eaf0", "sugg_border": "#e6d4e0",
     },
     "Midnight": {  # dark, warm
-        "surface": "#1c1714", "card": "#2a221d", "answer": "#322821",
-        "text": "#f3ebe4", "text_variant": "#c9b8ad",
-        "primary": "#e0865c", "on_primary": "#2a160c",
-        "secondary": "#a9c06b", "secondary_container": "#3e4c2a",
-        "on_secondary_container": "#cde29a", "outline": "#6a5b52",
-        "sugg_bg": "#241d18", "sugg_border": "#3a2f28",
+        "surface": "#1b1613", "card": "#2a221d", "answer": "#332a23",
+        "text": "#f4ece5", "text_variant": "#cbbbb0",
+        "primary": "#ef9266", "on_primary": "#2a160c",
+        "secondary": "#b6cd78", "secondary_container": "#3a4a26",
+        "on_secondary_container": "#cde29a", "outline": "#7a6a60",
+        "sugg_bg": "#251d18", "sugg_border": "#3a2f28",
     },
     "Deep Sea": {  # dark, cool
-        "surface": "#121a1d", "card": "#1d2a2e", "answer": "#24343a",
-        "text": "#e7f1f2", "text_variant": "#aac3c6",
-        "primary": "#4bb3a7", "on_primary": "#062420",
-        "secondary": "#e0a85c", "secondary_container": "#27383a",
-        "on_secondary_container": "#f0d8a8", "outline": "#4f6669",
-        "sugg_bg": "#18242a", "sugg_border": "#2c3e42",
+        "surface": "#10181b", "card": "#1c2a2e", "answer": "#24343a",
+        "text": "#e9f2f3", "text_variant": "#aec6c9",
+        "primary": "#54c2b5", "on_primary": "#03251f",
+        "secondary": "#ecae5e", "secondary_container": "#25393a",
+        "on_secondary_container": "#f0d8a8", "outline": "#50686b",
+        "sugg_bg": "#18242a", "sugg_border": "#2b3d41",
     },
 }
 THEME_NAMES = list(THEMES.keys())
@@ -80,7 +80,7 @@ def active_palette() -> dict:
 def _css(p: dict) -> str:
     return f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Work+Sans:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
 
 :root {{
   --sc-surface: {p['surface']}; --sc-card: {p['card']}; --sc-answer: {p['answer']};
@@ -92,24 +92,26 @@ def _css(p: dict) -> str:
 }}
 
 .stApp {{ background: var(--sc-surface); color: var(--sc-text);
-  font-family: 'Work Sans', sans-serif; }}
+  font-family: 'Hanken Grotesk', sans-serif; font-size: 16px; line-height: 1.55; }}
 [data-testid="stHeader"] {{ background: transparent; }}
 [data-testid="stSidebar"] {{ background: var(--sc-card); }}
 .stApp p, .stApp span, .stApp label, .stApp li, [data-testid="stMarkdownContainer"] {{
   color: var(--sc-text); }}
 h1, h2, h3, .sc-display {{
-  font-family: 'Plus Jakarta Sans', sans-serif !important;
-  font-weight: 700 !important; letter-spacing: -0.01em; color: var(--sc-text); }}
+  font-family: 'Bricolage Grotesque', sans-serif !important;
+  font-weight: 700 !important; letter-spacing: -0.02em; color: var(--sc-text); }}
 
-/* Buttons -> pills */
-.stButton > button {{
-  border-radius: 9999px; font-family: 'Work Sans', sans-serif; font-weight: 600;
+/* Buttons -> pills (cover form-submit buttons too) */
+.stButton > button, .stFormSubmitButton button {{
+  border-radius: 9999px; font-family: 'Hanken Grotesk', sans-serif; font-weight: 600;
   min-height: 52px; padding: 0 22px; border: none; transition: filter .12s ease;
   white-space: nowrap; }}
-.stButton > button:hover {{ filter: brightness(0.94); }}
-.stButton > button[kind="primary"] {{ background: var(--sc-primary); color: var(--sc-on-primary); }}
-.stButton > button[kind="secondary"] {{
-  background: var(--sc-card); color: var(--sc-text); border: 1px solid var(--sc-outline); }}
+.stButton > button:hover, .stFormSubmitButton button:hover {{ filter: brightness(0.94); }}
+button[kind="primary"], button[kind="primaryFormSubmit"] {{
+  background: var(--sc-primary) !important; color: var(--sc-on-primary) !important; }}
+button[kind="secondary"], button[kind="secondaryFormSubmit"] {{
+  background: var(--sc-card) !important; color: var(--sc-text) !important;
+  border: 1px solid var(--sc-outline) !important; }}
 
 /* Search bar: the wrapper is the pill (single clean focus border) */
 [data-testid="stChatInput"] > div {{ border-radius: 9999px !important;
@@ -122,10 +124,16 @@ h1, h2, h3, .sc-display {{
   background: var(--sc-card) !important; border: none !important;
   padding: 14px 22px !important; font-size: 18px !important; color: var(--sc-text) !important; }}
 
-/* Selectbox + segmented control (best-effort theming) */
+/* Selectbox + dropdown menu + segmented control (theme-aware) */
 [data-baseweb="select"] > div {{ background: var(--sc-card) !important;
   border-color: var(--sc-outline) !important; color: var(--sc-text) !important; }}
+[data-baseweb="popover"] [role="listbox"], [data-baseweb="menu"], ul[role="listbox"] {{
+  background: var(--sc-card) !important; }}
+[data-baseweb="menu"] li, ul[role="listbox"] li {{ color: var(--sc-text) !important; }}
 [data-testid="stSegmentedControl"] button {{ color: var(--sc-text) !important; }}
+[data-testid="stSegmentedControl"] button[aria-checked="true"],
+[data-testid="stSegmentedControl"] button[kind="primary"] {{
+  background: var(--sc-primary) !important; color: var(--sc-on-primary) !important; }}
 
 /* Mic component wrapper (the live waveform/transcript) */
 [class*="st-key-mic"] button {{ min-height: 96px !important; border-radius: 24px !important;
@@ -139,8 +147,8 @@ h1, h2, h3, .sc-display {{
 .sc-question {{ color: var(--sc-text-variant); font-size: 17px; margin-bottom: 6px; }}
 .sc-eyebrow {{ color: var(--sc-secondary); font-weight: 600; letter-spacing: 0.05em;
   text-transform: uppercase; font-size: 14px; }}
-.sc-wordmark {{ font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700;
-  font-size: 24px; color: var(--sc-primary); }}
+.sc-wordmark {{ font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800;
+  font-size: 25px; letter-spacing: -0.02em; color: var(--sc-primary); }}
 .sc-context {{ color: var(--sc-text-variant); font-size: 16px; margin: 8px 0 6px; }}
 
 [class*="st-key-say_"] button {{ min-height: 64px !important; font-size: 26px !important;
