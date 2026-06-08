@@ -132,9 +132,14 @@ button[kind="segmented_controlActive"] {{ background: var(--sc-primary) !importa
   color: var(--sc-on-primary) !important; border: 1px solid var(--sc-primary) !important; }}
 
 /* Mic component wrapper (the live waveform/transcript) */
-[class*="st-key-mic"] button {{ min-height: 96px !important; border-radius: 24px !important;
-  background: var(--sc-primary) !important; color: var(--sc-on-primary) !important;
-  font-size: 22px !important; font-weight: 700 !important; border: none !important; }}
+/* Voice recorder (st.audio_input) — themed; records audio so it works in every
+   browser and on phones (transcribed on the server). */
+[data-testid="stAudioInput"] {{ background: var(--sc-card) !important;
+  border: 1px solid var(--sc-outline) !important; border-radius: 16px !important;
+  min-height: 56px !important; }}
+[data-testid="stAudioInput"] * {{ color: var(--sc-text) !important; }}
+[data-testid="stAudioInput"] svg {{ fill: var(--sc-primary) !important;
+  color: var(--sc-primary) !important; }}
 
 /* Answer card */
 .sc-answer {{ background: var(--sc-answer); border-left: 5px solid var(--sc-primary);

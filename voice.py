@@ -116,6 +116,31 @@ def mic(key: str = "mic") -> dict | None:
     )
 
 
+@st.cache_resource(show_spinner=False)
+def _whisper_model():
+    """Load the on-server speech-to-text model once (cached for the app's life).
+    Small CPU model so it runs on free hosting; override size via SU_CHEF_WHISPER_MODEL."""
+    from faster_whisper import WhisperModel
+    name = os.environ.get("SU_CHEF_WHISPER_MODEL", "base.en")
+    return WhisperModel(name, device="cpu", compute_type="int8")
+
+
+def transcribe(audio_bytes: bytes) -> str:
+    """Turn recorded audio (WAV bytes from st.audio_input) into text, on-server.
+
+    Works in every browser and on phones because it only needs audio *recording*,
+    not the browser's own dictation. Returns "" on empty audio or any failure."""
+    if not audio_bytes:
+        return ""
+    try:
+        import io
+        segments, _ = _whisper_model().transcribe(
+            io.BytesIO(audio_bytes), language="en", beam_size=1)
+        return " ".join(s.text for s in segments).strip()
+    except Exception:
+        return ""
+
+
 def speak(text: str) -> None:
     """Read `text` aloud with the chosen accent voice."""
     if not text:

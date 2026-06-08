@@ -98,14 +98,25 @@ def _assistant_msg(reply: dict) -> dict:
 
 
 def _mic_to_ask(key: str) -> None:
-    """Render the mic; when a new utterance arrives (deduped on its timestamp),
-    treat it as an asked question."""
-    res = voice.mic(key=key)
-    if isinstance(res, dict) and res.get("text"):
-        seen = f"mic_seen_{key}"
-        if st.session_state.get(seen) != res.get("t"):
-            st.session_state[seen] = res.get("t")
-            ask(res["text"])
+    """Record a question with the mic and transcribe it on the server, then ask
+    it. Uses st.audio_input so it works in every browser and on phones (it only
+    needs audio recording, not the browser's own dictation). Deduped so the same
+    recording isn't processed twice across reruns."""
+    audio = st.audio_input("Tap to record your question", key=key,
+                           label_visibility="collapsed")
+    if audio is None:
+        return
+    data = audio.getvalue()
+    seen = f"mic_seen_{key}"
+    sig = (len(data), hash(data))
+    if st.session_state.get(seen) == sig or len(data) < 2000:
+        return
+    st.session_state[seen] = sig
+    with st.spinner("Turning your voice into text… "
+                    "(the very first time can take up to a minute while it warms up)"):
+        text = voice.transcribe(data)
+    if text:
+        ask(text)
 
 
 def _finish(chat: dict, spoken: str) -> None:
