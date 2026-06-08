@@ -162,10 +162,13 @@ rate.value = scRate(); rlabel.textContent = (+rate.value).toFixed(2) + 'x';
 function fillAccents(){
   const saved = localStorage.getItem('su_chef_accent') || 'james';
   acc.innerHTML = '';
-  SC_PERSONAS.forEach(p => {
+  // Available voices first; the "needs Edge" ones after (James stays first).
+  const avail = [], edge = [];
+  SC_PERSONAS.forEach(p => { (scAvailable(p.id) ? avail : edge).push(p); });
+  avail.concat(edge).forEach(p => {
+    const ok = scAvailable(p.id);
     const o = document.createElement('option');
     o.value = p.id;
-    const ok = scAvailable(p.id);
     o.textContent = p.name + ' · ' + p.accent + (ok ? '' : '  · needs Edge');
     if(!ok){ o.disabled = true; o.title = 'Open app in Edge browser'; }
     if(p.id === saved) o.selected = true;

@@ -144,18 +144,22 @@ def render_new_chat() -> None:
         "<h1 style='text-align:center;font-size:56px;margin:7vh 0 1vh'>"
         "How can I help?</h1>"
         "<p style='text-align:center;color:#55433c;font-size:18px;margin-bottom:4vh'>"
-        "Ask me anything while you cook — tap the mic or type below.</p>",
+        "Ask me anything while you cook!</p>",
         unsafe_allow_html=True)
 
-    mid = st.columns([1, 3, 1])[1]
+    # One centered block: mic + a typed search bar grouped together.
+    mid = st.columns([1, 4, 1])[1]
     with mid:
         _mic_to_ask("mic_new")
-        st.markdown("<p class='sc-eyebrow' style='text-align:center;margin-top:6px'>"
+        st.markdown("<p class='sc-eyebrow' style='text-align:center;margin:8px 0'>"
                     "or type it</p>", unsafe_allow_html=True)
-
-    typed = st.chat_input("Ask Su Chef anything… (e.g. “out of buttermilk — what now?”)")
-    if typed:
-        ask(typed)
+        with st.form("new_q", clear_on_submit=True, border=False):
+            typed = st.text_input(
+                "q", placeholder="e.g. “out of buttermilk — what now?”",
+                label_visibility="collapsed")
+            if st.form_submit_button("Ask Su Chef  →", type="primary",
+                                     use_container_width=True) and typed.strip():
+                ask(typed)
 
 
 # --- Main: an active chat ----------------------------------------------------
