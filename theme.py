@@ -72,7 +72,15 @@ def _css(p: dict) -> str:
 
 .stApp {{ background: var(--sc-surface); color: var(--sc-text);
   font-family: 'Hanken Grotesk', sans-serif; font-size: 16px; line-height: 1.55; }}
-[data-testid="stHeader"] {{ background: transparent; }}
+/* Opaque top bar so scrolled content can't bleed through it (esp. on mobile). */
+[data-testid="stHeader"] {{ background: var(--sc-surface);
+  border-bottom: 1px solid var(--sc-outline); }}
+/* Mobile: the sidebar open/close chevrons sit in that bar — give them a solid,
+   elevated background so they stay legible over any scrolled content. */
+[data-testid="stExpandSidebarButton"] button,
+[data-testid="stSidebarCollapseButton"] button {{ background: var(--sc-card) !important;
+  border: 1px solid var(--sc-outline) !important; border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,.18) !important; }}
 [data-testid="stSidebar"] {{ background: var(--sc-card); }}
 .stApp p, .stApp span, .stApp label, .stApp li, [data-testid="stMarkdownContainer"] {{
   color: var(--sc-text); }}
@@ -132,14 +140,10 @@ button[kind="segmented_controlActive"] {{ background: var(--sc-primary) !importa
   color: var(--sc-on-primary) !important; border: 1px solid var(--sc-primary) !important; }}
 
 /* Mic component wrapper (the live waveform/transcript) */
-/* Voice recorder (st.audio_input) — themed; records audio so it works in every
-   browser and on phones (transcribed on the server). */
-[data-testid="stAudioInput"] {{ background: var(--sc-card) !important;
-  border: 1px solid var(--sc-outline) !important; border-radius: 16px !important;
-  min-height: 56px !important; }}
-[data-testid="stAudioInput"] * {{ color: var(--sc-text) !important; }}
-[data-testid="stAudioInput"] svg {{ fill: var(--sc-primary) !important;
-  color: var(--sc-primary) !important; }}
+/* Voice recorder: a custom component (records audio, auto-stops on a pause,
+   transcribed on the server). It styles its own button via the palette passed
+   from Python, so its iframe wrapper just needs to sit flush. */
+[class*="st-key-mic"] iframe {{ border: none !important; }}
 
 /* Answer card */
 .sc-answer {{ background: var(--sc-answer); border-left: 5px solid var(--sc-primary);

@@ -105,8 +105,9 @@ _mic_component = components.declare_component(
 
 
 def mic(key: str = "mic") -> dict | None:
-    """Render the tap-to-speak mic (live waveform + words). Returns the last
-    recognized {text, t} or None."""
+    """Render the tap-to-speak mic (records audio + waveform, auto-stops on a
+    pause). Returns the last recording as {audio: dataURL, t: ms} or None;
+    callers decode the audio and transcribe it server-side."""
     import theme
     p = theme.active_palette()
     return _mic_component(

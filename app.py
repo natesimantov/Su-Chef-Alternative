@@ -10,6 +10,7 @@ Run:  streamlit run app.py
 
 from __future__ import annotations
 
+import base64
 from contextlib import contextmanager
 
 import streamlit as st
@@ -99,22 +100,26 @@ def _assistant_msg(reply: dict) -> dict:
 
 def _mic_to_ask(key: str) -> None:
     """Record a question with the mic and transcribe it on the server, then ask
-    it. Uses st.audio_input so it works in every browser and on phones (it only
-    needs audio recording, not the browser's own dictation). Deduped so the same
-    recording isn't processed twice across reruns."""
-    audio = st.audio_input("Tap to record your question", key=key,
-                           label_visibility="collapsed")
-    if audio is None:
+    it. The recorder (voice.mic) records audio and auto-stops ~2s after the cook
+    stops talking, so it works in every browser and on phones (it needs only
+    audio recording, not the browser's own dictation). Deduped on the recording
+    timestamp so the same clip isn't processed twice across reruns."""
+    res = voice.mic(key=key)
+    if not (isinstance(res, dict) and res.get("audio")):
         return
-    data = audio.getvalue()
     seen = f"mic_seen_{key}"
-    sig = (len(data), hash(data))
-    if st.session_state.get(seen) == sig or len(data) < 2000:
+    if st.session_state.get(seen) == res.get("t"):
         return
-    st.session_state[seen] = sig
+    st.session_state[seen] = res.get("t")
+    dataurl = res["audio"]
+    b64 = dataurl.split(",", 1)[1] if "," in dataurl else dataurl
+    try:
+        audio_bytes = base64.b64decode(b64)
+    except Exception:
+        return
     with st.spinner("Turning your voice into text… "
                     "(the very first time can take up to a minute while it warms up)"):
-        text = voice.transcribe(data)
+        text = voice.transcribe(audio_bytes)
     if text:
         ask(text)
 

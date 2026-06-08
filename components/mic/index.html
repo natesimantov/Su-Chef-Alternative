@@ -3,28 +3,23 @@
 <head>
 <meta charset="utf-8" />
 <style>
-  html, body { margin: 0; padding: 0; font-family: 'Work Sans', sans-serif; }
+  html, body { margin: 0; padding: 0; font-family: 'Hanken Grotesk', sans-serif; }
   #wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
   #mic {
     width: 100%; min-height: 64px; border: none; border-radius: 9999px;
-    background: #944521; color: #fff; font-size: 20px; font-weight: 600;
+    background: #b4501f; color: #fff; font-size: 20px; font-weight: 600;
     cursor: pointer; transition: filter .12s ease;
   }
   #mic:hover { filter: brightness(0.96); }
   #mic.listening { background: #ba1a1a; }
   #canvas { width: 100%; height: 40px; display: none; }
-  #live {
-    width: 100%; min-height: 22px; color: #55433c; font-size: 17px;
-    text-align: center; font-style: italic;
-  }
-  #hint { color: #7a6a63; font-size: 12px; text-align: center; }
+  #hint { color: #7a6a63; font-size: 13px; text-align: center; min-height: 18px; }
 </style>
 </head>
 <body>
 <div id="wrap">
   <button id="mic">🎙️&nbsp; Tap to speak</button>
   <canvas id="canvas" width="600" height="40"></canvas>
-  <div id="live"></div>
   <div id="hint"></div>
 </div>
 <script>
@@ -39,12 +34,18 @@ const Streamlit = {
 };
 function fit() { Streamlit.height(document.getElementById("wrap").scrollHeight + 4); }
 
+// --- Tunable voice-activity-detection thresholds ----------------------------
+const SILENCE_MS = 2000;   // stop this long after the user stops talking
+const MAX_MS = 15000;      // hard cap on a single recording
+const NO_SPEECH_MS = 7000; // give up if they never start talking
+const SPEAK_RMS = 9;       // RMS above this = "they're talking"
+const SILENCE_RMS = 6;     // RMS below this = "silence"
+
 const micBtn = document.getElementById("mic");
 const canvas = document.getElementById("canvas");
-const live = document.getElementById("live");
 const hint = document.getElementById("hint");
 const ctx = canvas.getContext("2d");
-let THEME = { primary: "#944521", onp: "#ffffff", wave: "#b35c37", text: "#55433c" };
+let THEME = { primary: "#b4501f", onp: "#ffffff", wave: "#b35c37", text: "#55433c" };
 
 // Receive theme colors from Python (component args on every render).
 window.addEventListener("message", (e) => {
@@ -54,32 +55,32 @@ window.addEventListener("message", (e) => {
     if (a.on_primary) THEME.onp = a.on_primary;
     if (a.wave) THEME.wave = a.wave;
     if (a.text) THEME.text = a.text;
-    live.style.color = THEME.text;
-    if (!listening) { micBtn.style.background = THEME.primary; micBtn.style.color = THEME.onp; }
+    hint.style.color = THEME.text;
+    if (!recording) { micBtn.style.background = THEME.primary; micBtn.style.color = THEME.onp; }
   }
 });
 
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recog = null, listening = false, finalText = "", audioCtx, analyser, rafId, stream;
+let recorder = null, recording = false, chunks = [];
+let stream, audioCtx, analyser, rafId;
+let startedAt = 0, lastVoiceAt = 0, hasSpoken = false;
 
-if (!SR) {
-  micBtn.disabled = true;
-  hint.textContent = "Voice input isn't supported in this browser — type below.";
+function setRecording(on) {
+  recording = on;
+  micBtn.classList.toggle("listening", on);
+  micBtn.style.background = on ? "#ba1a1a" : THEME.primary;
+  micBtn.style.color = THEME.onp;
+  micBtn.innerHTML = on ? "⏹&nbsp; Listening… I'll submit when you pause"
+                        : "🎙️&nbsp; Tap to speak";
 }
 
-function startWave() {
-  navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => {
-    stream = s;
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const src = audioCtx.createMediaStreamSource(s);
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 64;
-    src.connect(analyser);
-    canvas.style.display = "block";
-    fit();
-    draw();
-  }).catch(() => { /* no waveform if mic blocked; recognition may still work */ });
+function rms() {
+  const buf = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) { const d = buf[i] - 128; sum += d * d; }
+  return Math.sqrt(sum / buf.length);
 }
+
 function draw() {
   const bins = analyser.frequencyBinCount;
   const data = new Uint8Array(bins);
@@ -91,61 +92,69 @@ function draw() {
     const h = (data[i] / 255) * canvas.height;
     ctx.fillRect(i * bw + 1, (canvas.height - h) / 2, bw - 2, Math.max(2, h));
   }
+  // Voice-activity auto-stop logic.
+  const now = Date.now();
+  const level = rms();
+  if (level > SPEAK_RMS) { hasSpoken = true; lastVoiceAt = now; }
+  if (now - startedAt > MAX_MS) { stop(); return; }
+  if (!hasSpoken && now - startedAt > NO_SPEECH_MS) { stop(); return; }
+  if (hasSpoken && level < SILENCE_RMS && now - lastVoiceAt > SILENCE_MS) { stop(); return; }
   rafId = requestAnimationFrame(draw);
-}
-function stopWave() {
-  cancelAnimationFrame(rafId);
-  if (stream) stream.getTracks().forEach((t) => t.stop());
-  if (audioCtx) audioCtx.close().catch(() => {});
-  canvas.style.display = "none";
-  fit();
-}
-
-function setListening(on) {
-  listening = on;
-  micBtn.style.background = on ? "#ba1a1a" : THEME.primary;
-  micBtn.style.color = THEME.onp;
-  micBtn.innerHTML = on ? "⏹&nbsp; Listening… tap to stop" : "🎙️&nbsp; Tap to speak";
 }
 
 function start() {
-  finalText = ""; live.textContent = ""; hint.textContent = "";
-  recog = new SR();
-  recog.lang = "en-US"; recog.interimResults = true; recog.continuous = false;
-  recog.onresult = (e) => {
-    let interim = "";
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const t = e.results[i][0].transcript;
-      if (e.results[i].isFinal) finalText += t; else interim += t;
-    }
-    live.textContent = (finalText + " " + interim).trim();
+  hint.textContent = "";
+  if (!navigator.mediaDevices || !window.MediaRecorder) {
+    hint.textContent = "Recording isn't supported here — type your question below.";
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => {
+    stream = s; chunks = [];
+    recorder = new MediaRecorder(s);
+    recorder.ondataavailable = (ev) => { if (ev.data.size) chunks.push(ev.data); };
+    recorder.onstop = finish;
+    recorder.start();
+
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(s);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    src.connect(analyser);
+
+    startedAt = Date.now(); lastVoiceAt = startedAt; hasSpoken = false;
+    canvas.style.display = "block";
+    setRecording(true);
     fit();
-  };
-  recog.onerror = (e) => {
-    const msgs = {
-      "network": "Voice input is blocked in this browser. It works in Microsoft Edge, or just type your question below.",
-      "not-allowed": "Microphone access is blocked — allow it in your browser, or type below.",
-      "service-not-allowed": "Microphone access is blocked — allow it in your browser, or type below.",
-      "no-speech": "Didn't catch that — tap to try again, or type below.",
-      "audio-capture": "No microphone found — type your question below instead.",
-      "aborted": "",
-    };
-    const m = (e.error in msgs) ? msgs[e.error] : "Voice input hiccup — type your question below instead.";
-    if (m) hint.textContent = m;
-  };
-  recog.onend = () => {
-    setListening(false); stopWave();
-    const text = finalText.trim();
-    if (text) { Streamlit.value({ text: text, t: Date.now() }); live.textContent = text; }
-  };
-  try { recog.start(); setListening(true); startWave(); }
-  catch (err) { hint.textContent = "Couldn't start the mic — type below."; }
+    draw();
+  }).catch(() => {
+    hint.textContent = "Couldn't reach the microphone — allow mic access, or type below.";
+  });
 }
 
-micBtn.addEventListener("click", () => {
-  if (listening) { try { recog.stop(); } catch (e) {} }
-  else { start(); }
-});
+function stop() {
+  if (!recording) return;
+  cancelAnimationFrame(rafId);
+  canvas.style.display = "none";
+  setRecording(false);
+  try { recorder.stop(); } catch (e) {}
+}
+
+function finish() {
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  if (audioCtx) audioCtx.close().catch(() => {});
+  fit();
+  if (!hasSpoken || !chunks.length) {
+    hint.textContent = "Didn't catch anything — tap to try again, or type below.";
+    return;
+  }
+  hint.textContent = "Got it — one moment…";
+  const blob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+  const reader = new FileReader();
+  reader.onloadend = () => Streamlit.value({ audio: reader.result, t: Date.now() });
+  reader.readAsDataURL(blob);
+}
+
+micBtn.addEventListener("click", () => { recording ? stop() : start(); });
 
 Streamlit.ready();
 fit();
