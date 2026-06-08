@@ -95,7 +95,7 @@ button[kind="secondary"], button[kind="secondaryFormSubmit"] {{
    not the page foreground (otherwise primary buttons show dark body text on the
    primary background). */
 button[kind="primary"] *, button[kind="primaryFormSubmit"] *,
-[data-testid="stSegmentedControl"] button[aria-checked="true"] * {{
+button[kind="segmented_controlActive"] * {{
   color: var(--sc-on-primary) !important; }}
 button[kind="secondary"] *, button[kind="secondaryFormSubmit"] * {{
   color: var(--sc-text) !important; }}
@@ -122,9 +122,14 @@ button:focus-visible, input:focus-visible, [role="option"]:focus-visible,
 [data-baseweb="popover"] [role="listbox"], [data-baseweb="menu"], ul[role="listbox"] {{
   background: var(--sc-card) !important; }}
 [data-baseweb="menu"] li, ul[role="listbox"] li {{ color: var(--sc-text) !important; }}
-[data-testid="stSegmentedControl"] button {{ color: var(--sc-text) !important; }}
-[data-testid="stSegmentedControl"] button[aria-checked="true"] {{
-  background: var(--sc-primary) !important; color: var(--sc-on-primary) !important; }}
+/* Segmented control (units toggle): Streamlit marks the selected pill with
+   kind="segmented_controlActive" (NOT aria-checked) — theme both states so the
+   unselected pill never keeps its default near-white bg under light body text. */
+button[kind="segmented_control"] {{ background: var(--sc-card) !important;
+  color: var(--sc-text) !important; border: 1px solid var(--sc-outline) !important; }}
+button[kind="segmented_control"] * {{ color: var(--sc-text) !important; }}
+button[kind="segmented_controlActive"] {{ background: var(--sc-primary) !important;
+  color: var(--sc-on-primary) !important; border: 1px solid var(--sc-primary) !important; }}
 
 /* Mic component wrapper (the live waveform/transcript) */
 [class*="st-key-mic"] button {{ min-height: 96px !important; border-radius: 24px !important;
