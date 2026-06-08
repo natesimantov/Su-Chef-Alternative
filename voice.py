@@ -107,7 +107,13 @@ _mic_component = components.declare_component(
 def mic(key: str = "mic") -> dict | None:
     """Render the tap-to-speak mic (live waveform + words). Returns the last
     recognized {text, t} or None."""
-    return _mic_component(default=None, key=key)
+    import theme
+    p = theme.active_palette()
+    return _mic_component(
+        default=None, key=key,
+        primary=p["primary"], on_primary=p["on_primary"],
+        wave=p["primary"], text=p["text_variant"],
+    )
 
 
 def speak(text: str) -> None:
@@ -131,14 +137,15 @@ def speak_button(text: str, key: str) -> None:
 # without f-string brace gymnastics.
 _SETTINGS_HTML = """
 <style>
-  .sc-vs { font-family:'Work Sans',sans-serif; color:#1b1c1c; }
-  .sc-vs label { font-size:13px; font-weight:600; color:#55433c; }
+  body { background: __PANELBG__; }
+  .sc-vs { font-family:'Work Sans',sans-serif; color:__TEXT__; }
+  .sc-vs label { font-size:13px; font-weight:600; color:__TV__; }
   .sc-vs select, .sc-vs input { width:100%; margin:4px 0 10px; border-radius:10px;
-    border:1px solid #dbc1b8; padding:8px; background:#fff; }
-  .sc-vs button { width:100%; border:none; border-radius:9999px; background:#944521;
-    color:#fff; font-weight:600; padding:9px; cursor:pointer; }
-  .sc-note { font-size:11px; color:#7a6a63; margin:8px 0 0; line-height:1.4; }
-  .sc-using { font-size:12px; color:#56642b; font-weight:600; margin:2px 0 10px; }
+    border:1px solid __OUTLINE__; padding:8px; background:__INBG__; color:__TEXT__; }
+  .sc-vs button { width:100%; border:none; border-radius:9999px; background:__PRIMARY__;
+    color:__ONP__; font-weight:600; padding:9px; cursor:pointer; }
+  .sc-note { font-size:11px; color:__TV__; margin:8px 0 0; line-height:1.4; }
+  .sc-using { font-size:12px; color:__SECONDARY__; font-weight:600; margin:2px 0 10px; }
 </style>
 <div class="sc-vs">
   <label>Voice</label>
@@ -207,5 +214,17 @@ window.speechSynthesis.addEventListener('voiceschanged', fillAccents);
 
 
 def voice_settings() -> None:
-    """An accent voice picker (6 profiles + auto), speed, and a test button."""
-    components.html(_SETTINGS_HTML.replace("/*VOICE_JS*/", _VOICE_JS), height=320)
+    """An accent voice picker (personas), speed, and a test button — themed."""
+    import theme
+    p = theme.active_palette()
+    html = (_SETTINGS_HTML
+            .replace("/*VOICE_JS*/", _VOICE_JS)
+            .replace("__PANELBG__", p["card"])
+            .replace("__INBG__", p["surface"])
+            .replace("__PRIMARY__", p["primary"])
+            .replace("__ONP__", p["on_primary"])
+            .replace("__TEXT__", p["text"])
+            .replace("__TV__", p["text_variant"])
+            .replace("__OUTLINE__", p["outline"])
+            .replace("__SECONDARY__", p["secondary"]))
+    components.html(html, height=320)

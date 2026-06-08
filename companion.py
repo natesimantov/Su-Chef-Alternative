@@ -65,12 +65,20 @@ def _api_key() -> str | None:
     return os.environ.get("ANTHROPIC_API_KEY")
 
 
-def answer(messages: list[dict]) -> dict:
+_UNITS = {
+    "metric": "Use metric units throughout: Celsius for temperature, and "
+              "grams/millilitres/litres for measures.",
+    "us": "Use US customary units throughout: Fahrenheit for temperature, and "
+          "cups/ounces/pounds/teaspoons/tablespoons for measures.",
+}
+
+
+def answer(messages: list[dict], units: str = "metric") -> dict:
     """Return Su Chef's structured reply to the conversation so far."""
     key = _api_key()
     if key:
         try:
-            return _ask_claude(messages, key)
+            return _ask_claude(messages, key, units)
         except Exception as exc:  # network/auth/etc. — degrade gracefully
             return {
                 "context": "",
@@ -83,14 +91,15 @@ def answer(messages: list[dict]) -> dict:
     return _offline_reply(latest)
 
 
-def _ask_claude(messages: list[dict], key: str) -> dict:
+def _ask_claude(messages: list[dict], key: str, units: str = "metric") -> dict:
     import anthropic
 
     client = anthropic.Anthropic(api_key=key)
+    system = SYSTEM_PROMPT + "\n\n" + _UNITS.get(units, _UNITS["metric"])
     resp = client.messages.create(
         model=MODEL,
         max_tokens=400,
-        system=SYSTEM_PROMPT,
+        system=system,
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],
         output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
     )

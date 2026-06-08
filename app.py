@@ -14,6 +14,8 @@ from contextlib import contextmanager
 
 import streamlit as st
 
+from streamlit_js_eval import streamlit_js_eval
+
 import companion
 import storage
 import theme
@@ -36,6 +38,7 @@ def _init_state() -> None:
     st.session_state.setdefault("active_chat", None)   # dict or None (= new chat)
     st.session_state.setdefault("followup_open", False)
     st.session_state.setdefault("pending_speak", None)
+    st.session_state.setdefault("theme_ctrl", theme.DEFAULT_THEME)
 
 
 def _new_chat() -> None:
@@ -61,9 +64,13 @@ def ask(question: str) -> None:
                 "created_at": storage._now(), "messages": []}
     chat["messages"].append({"role": "user", "content": question})
     with _thinking():
-        reply = companion.answer(chat["messages"])
+        reply = companion.answer(chat["messages"], units=_units())
     chat["messages"].append(_assistant_msg(reply))
     _finish(chat, reply["answer"])
+
+
+def _units() -> str:
+    return st.session_state.get("units", "metric")
 
 
 def regenerate(chat: dict, idx: int, corrected_context: str) -> None:
@@ -74,7 +81,7 @@ def regenerate(chat: dict, idx: int, corrected_context: str) -> None:
                   "content": f"(Quick context correction: {corrected_context}.) "
                              "Please answer again with this in mind."})
     with _thinking():
-        reply = companion.answer(convo)
+        reply = companion.answer(convo, units=_units())
     new_msg = _assistant_msg(reply)
     if corrected_context.strip():
         new_msg["context"] = corrected_context.strip()
@@ -280,10 +287,35 @@ def _render_answer(chat: dict, idx: int, is_last: bool) -> None:
         st.rerun()
 
 
+def _detect_units_default() -> None:
+    """Default units from the browser locale once: US → °F, everyone else → °C."""
+    lang = streamlit_js_eval(js_expressions="navigator.language", key="locale_detect")
+    if not st.session_state.get("_units_detected") and lang:
+        st.session_state["units_ctrl"] = (
+            "US °F" if str(lang).lower().endswith("-us") else "Metric °C")
+        st.session_state["_units_detected"] = True
+
+
+def _top_controls() -> None:
+    """Units toggle (left) and theme picker (right), at the top of every screen."""
+    c1, _, c3 = st.columns([3, 1, 3])
+    with c1:
+        st.segmented_control(
+            "Units", ["Metric °C", "US °F"], default="Metric °C",
+            key="units_ctrl", label_visibility="collapsed")
+        st.session_state["units"] = (
+            "us" if st.session_state.get("units_ctrl") == "US °F" else "metric")
+    with c3:
+        st.selectbox("Theme", theme.THEME_NAMES, key="theme_ctrl",
+                     label_visibility="collapsed")
+
+
 def main() -> None:
     st.set_page_config(page_title="Su Chef", page_icon="🍳", layout="centered")
-    inject_theme()
     _init_state()
+    _detect_units_default()
+    inject_theme(st.session_state.get("theme_ctrl", theme.DEFAULT_THEME))
+    _top_controls()
 
     render_sidebar()
     chat = st.session_state.get("active_chat")

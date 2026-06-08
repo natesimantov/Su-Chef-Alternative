@@ -44,6 +44,20 @@ const canvas = document.getElementById("canvas");
 const live = document.getElementById("live");
 const hint = document.getElementById("hint");
 const ctx = canvas.getContext("2d");
+let THEME = { primary: "#944521", onp: "#ffffff", wave: "#b35c37", text: "#55433c" };
+
+// Receive theme colors from Python (component args on every render).
+window.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "streamlit:render") {
+    const a = (e.data.args) || {};
+    if (a.primary) THEME.primary = a.primary;
+    if (a.on_primary) THEME.onp = a.on_primary;
+    if (a.wave) THEME.wave = a.wave;
+    if (a.text) THEME.text = a.text;
+    live.style.color = THEME.text;
+    if (!listening) { micBtn.style.background = THEME.primary; micBtn.style.color = THEME.onp; }
+  }
+});
 
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let recog = null, listening = false, finalText = "", audioCtx, analyser, rafId, stream;
@@ -72,7 +86,7 @@ function draw() {
   analyser.getByteFrequencyData(data);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const bw = canvas.width / bins;
-  ctx.fillStyle = "#b35c37";
+  ctx.fillStyle = THEME.wave;
   for (let i = 0; i < bins; i++) {
     const h = (data[i] / 255) * canvas.height;
     ctx.fillRect(i * bw + 1, (canvas.height - h) / 2, bw - 2, Math.max(2, h));
@@ -89,7 +103,8 @@ function stopWave() {
 
 function setListening(on) {
   listening = on;
-  micBtn.classList.toggle("listening", on);
+  micBtn.style.background = on ? "#ba1a1a" : THEME.primary;
+  micBtn.style.color = THEME.onp;
   micBtn.innerHTML = on ? "⏹&nbsp; Listening… tap to stop" : "🎙️&nbsp; Tap to speak";
 }
 
