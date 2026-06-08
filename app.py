@@ -96,7 +96,7 @@ def render_sidebar() -> None:
 
         st.markdown("<hr style='margin:16px 0;border:none;border-top:1px solid "
                     "#dbc1b8'>", unsafe_allow_html=True)
-        with st.expander("🔊  Voice"):
+        with st.expander("🔊  Voice & accent"):
             voice.voice_settings()
 
 
