@@ -95,7 +95,10 @@ h1, h2, h3, .sc-display {{
   white-space: nowrap; }}
 .stButton > button:hover, .stFormSubmitButton button:hover {{ filter: brightness(0.94); }}
 button[kind="primary"], button[kind="primaryFormSubmit"] {{
-  background: var(--sc-primary) !important; color: var(--sc-on-primary) !important; }}
+  background: var(--sc-primary) !important; color: var(--sc-on-primary) !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,.16) !important; transition: all .12s ease; }}
+button[kind="primary"]:hover, button[kind="primaryFormSubmit"]:hover {{
+  box-shadow: 0 4px 12px rgba(0,0,0,.22) !important; transform: translateY(-1px); }}
 button[kind="secondary"], button[kind="secondaryFormSubmit"] {{
   background: var(--sc-card) !important; color: var(--sc-text) !important;
   border: 1px solid var(--sc-outline) !important; }}
@@ -148,19 +151,49 @@ button[kind="segmented_controlActive"] {{ background: var(--sc-primary) !importa
 /* Answer card */
 .sc-answer {{ background: var(--sc-answer); border-left: 5px solid var(--sc-primary);
   border-radius: 12px; padding: 22px 26px; font-size: 22px; line-height: 1.5;
-  color: var(--sc-text); }}
-.sc-question {{ color: var(--sc-text-variant); font-size: 17px; margin-bottom: 6px; }}
+  color: var(--sc-text); box-shadow: 0 2px 12px rgba(0,0,0,.07); }}
+.sc-question {{ color: var(--sc-text-variant); font-size: 17px; margin-bottom: 6px;
+  font-style: italic; }}
 .sc-eyebrow {{ color: var(--sc-secondary); font-weight: 600; letter-spacing: 0.05em;
   text-transform: uppercase; font-size: 14px; }}
 .sc-wordmark {{ font-family: 'Bricolage Grotesque', sans-serif; font-weight: 800;
   font-size: 25px; letter-spacing: -0.02em; color: var(--sc-primary); }}
-.sc-context {{ color: var(--sc-text-variant); font-size: 16px; margin: 8px 0 6px; }}
+/* Higher specificity than `.stApp p` so the context line is its intended light
+   gray (matching the subtitle), not the dark body color. */
+.stApp p.sc-context {{ color: var(--sc-text-variant); font-size: 16px; margin: 8px 0 6px; }}
 
-[class*="st-key-say_"] button {{ min-height: 64px !important; font-size: 26px !important;
+/* Read-aloud button: prominent, centered glyph. */
+[class*="st-key-say_"] button {{ display: flex !important; align-items: center !important;
+  justify-content: center !important; min-height: 56px !important; font-size: 24px !important;
   padding: 0 !important; background: var(--sc-card) !important; color: var(--sc-text) !important;
-  border: 1px solid var(--sc-primary) !important; }}
-[class*="st-key-pintoggle_"] button {{ min-height: 42px !important; font-size: 20px !important; padding: 0 !important; }}
-[class*="st-key-ctxedit_"] button {{ min-height: 38px !important; padding: 0 !important; }}
+  border: 1px solid var(--sc-primary) !important; border-radius: 12px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.10) !important; transition: all .12s ease; }}
+[class*="st-key-say_"] button:hover {{ box-shadow: 0 3px 8px rgba(0,0,0,.16) !important;
+  transform: translateY(-1px); }}
+
+/* Icon-only buttons (rename ✎, delete ✕, unpin ✕, context-edit ✎, pin 📌):
+   perfectly centered glyph, equal square, subtle depth + hover — not flat.
+   (They're secondary buttons, so card bg + outline border already apply; the
+   pin keeps its clay fill when pinned because we don't override its background.) */
+[class*="st-key-chrn_"] button, [class*="st-key-chdel_"] button,
+[class*="st-key-unpin_"] button, [class*="st-key-ctxedit_"] button,
+[class*="st-key-pintoggle_"] button {{
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  width: 40px !important; min-width: 40px !important; height: 40px !important;
+  min-height: 40px !important; padding: 0 !important; margin: 0 auto !important;
+  border-radius: 10px !important; font-size: 18px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.10) !important; transition: all .12s ease; }}
+[class*="st-key-chrn_"] button p, [class*="st-key-chdel_"] button p,
+[class*="st-key-unpin_"] button p, [class*="st-key-ctxedit_"] button p,
+[class*="st-key-pintoggle_"] button p {{ margin: 0 !important; line-height: 1 !important; }}
+[class*="st-key-chrn_"] button:hover, [class*="st-key-chdel_"] button:hover,
+[class*="st-key-unpin_"] button:hover, [class*="st-key-ctxedit_"] button:hover,
+[class*="st-key-pintoggle_"] button:hover {{
+  box-shadow: 0 3px 8px rgba(0,0,0,.16) !important; transform: translateY(-1px); }}
+/* faint tint on hover for the plain (non-pin) icon buttons */
+[class*="st-key-chrn_"] button:hover, [class*="st-key-chdel_"] button:hover,
+[class*="st-key-unpin_"] button:hover, [class*="st-key-ctxedit_"] button:hover {{
+  background: var(--sc-sugg-bg) !important; }}
 
 /* Sidebar recent-chat + pinned titles: left-align and truncate with an ellipsis
    so long titles never spill past the pill or under the ✎/✕ buttons. */
@@ -172,6 +205,10 @@ button[kind="segmented_controlActive"] {{ background: var(--sc-primary) !importa
 [class*="st-key-chat_"] button p, [class*="st-key-pin_"] button p {{
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   display: block; width: 100%; }}
+/* Gentle hover affordance on the sidebar pills (depth, not flat). */
+[class*="st-key-chat_"] button, [class*="st-key-pin_"] button {{ transition: all .12s ease; }}
+[class*="st-key-chat_"] button:hover, [class*="st-key-pin_"] button:hover {{
+  background: var(--sc-sugg-bg) !important; box-shadow: 0 2px 6px rgba(0,0,0,.10) !important; }}
 
 /* Hide Streamlit's "Press Enter to submit form" input hint everywhere. */
 [data-testid="InputInstructions"] {{ display: none !important; }}
