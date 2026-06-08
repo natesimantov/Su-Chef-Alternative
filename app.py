@@ -73,6 +73,17 @@ def _assistant_msg(reply: dict) -> dict:
             "follow_ups": reply.get("follow_ups", [])}
 
 
+def _mic_to_ask(key: str) -> None:
+    """Render the mic; when a new utterance arrives (deduped on its timestamp),
+    treat it as an asked question."""
+    res = voice.mic(key=key)
+    if isinstance(res, dict) and res.get("text"):
+        seen = f"mic_seen_{key}"
+        if st.session_state.get(seen) != res.get("t"):
+            st.session_state[seen] = res.get("t")
+            ask(res["text"])
+
+
 def _finish(chat: dict, spoken: str) -> None:
     storage.save_chat(chat)
     st.session_state["active_chat"] = chat
@@ -138,9 +149,7 @@ def render_new_chat() -> None:
 
     mid = st.columns([1, 3, 1])[1]
     with mid:
-        spoken = voice.listen(key="mic_new")
-        if spoken:
-            ask(spoken)
+        _mic_to_ask("mic_new")
         st.markdown("<p class='sc-eyebrow' style='text-align:center;margin-top:6px'>"
                     "or type it</p>", unsafe_allow_html=True)
 
@@ -175,9 +184,7 @@ def render_chat(chat: dict) -> None:
     if st.session_state.get("followup_open"):
         st.markdown("<p class='sc-eyebrow' style='margin-top:18px'>Continue this "
                     "chat</p>", unsafe_allow_html=True)
-        spoken = voice.listen(key="mic_followup")
-        if spoken:
-            ask(spoken)
+        _mic_to_ask("mic_followup")
         typed = st.chat_input("Ask a follow-up…")
         if typed:
             ask(typed)
@@ -208,7 +215,7 @@ def _render_answer(chat: dict, idx: int, is_last: bool) -> None:
         if is_last:
             c1, c2 = st.columns([11, 1])
             with c1:
-                st.markdown(f"<p class='sc-context'><i>{ctx}</i></p>",
+                st.markdown(f"<p class='sc-context'>{ctx}</p>",
                             unsafe_allow_html=True)
             with c2:
                 if st.button("✎", key=f"ctxedit_{cid}_{idx}",
@@ -216,7 +223,7 @@ def _render_answer(chat: dict, idx: int, is_last: bool) -> None:
                     st.session_state["edit_context"] = idx
                     st.rerun()
         else:
-            st.markdown(f"<p class='sc-context'><i>{ctx}</i></p>",
+            st.markdown(f"<p class='sc-context'>{ctx}</p>",
                         unsafe_allow_html=True)
 
     # 2) Answer card + pin (top-right) and a big read-aloud button on the right.

@@ -27,7 +27,7 @@ import streamlit.components.v1 as components
 # then by preferred (natural) voice names, then fall back gracefully.
 _VOICE_JS = """
 const SC_ACCENTS = {
-  auto:   {lang:'en',    names:['Natural','Online','Google US','Google UK','Aria','Jenny','Samantha']},
+  james:  {lang:'en',    names:['Natural','Online','Google US','Google UK','Aria','Jenny','Samantha']},
   alan:   {lang:'en-gb', names:['Ryan','George','Thomas','Natural','Online','Google UK English Male']},
   emma:   {lang:'en-gb', names:['Sonia','Libby','Hazel','Natural','Online','Google UK English Female']},
   thomas: {lang:'en-us', names:['Guy','Davis','Andrew','Tony','Eric','Natural','Online']},
@@ -39,18 +39,39 @@ const SC_ACCENTS = {
   arjun:  {lang:'en-in', names:['Prabhat','Natural','Online']},
   priya:  {lang:'en-in', names:['Neerja','Natural','Online']}
 };
-function scProfile(){ return SC_ACCENTS[localStorage.getItem('su_chef_accent') || 'auto'] || SC_ACCENTS.auto; }
+const SC_PERSONAS = [
+  {id:'james',  name:'James',  accent:'Default'},
+  {id:'alan',   name:'Alan',   accent:'British'},
+  {id:'emma',   name:'Emma',   accent:'British'},
+  {id:'thomas', name:'Thomas', accent:'American'},
+  {id:'mia',    name:'Mia',    accent:'American'},
+  {id:'liam',   name:'Liam',   accent:'Irish'},
+  {id:'erin',   name:'Erin',   accent:'Irish'},
+  {id:'jack',   name:'Jack',   accent:'Australian'},
+  {id:'chloe',  name:'Chloe',  accent:'Australian'},
+  {id:'arjun',  name:'Arjun',  accent:'Indian'},
+  {id:'priya',  name:'Priya',  accent:'Indian'}
+];
 function scNorm(l){ return (l||'').toLowerCase().replace('_','-'); }
+function scProfile(){ return SC_ACCENTS[localStorage.getItem('su_chef_accent') || 'james'] || SC_ACCENTS.james; }
+function scAvailable(id){
+  const prof = SC_ACCENTS[id]; if(!prof) return false;
+  if(prof.lang === 'en') return true;  // James / default always works
+  return window.speechSynthesis.getVoices().some(v => scNorm(v.lang).startsWith(prof.lang));
+}
 function scResolve(voices){
   const prof = scProfile();
   let pool = voices.filter(v => scNorm(v.lang).startsWith(prof.lang));
+  const exact = pool.length > 0;
   if(!pool.length) pool = voices.filter(v => /^en/i.test(v.lang));
   if(!pool.length) pool = voices;
+  let pick = null;
   for(const t of prof.names){
     const hit = pool.find(v => v.name.toLowerCase().includes(t.toLowerCase()));
-    if(hit) return hit;
+    if(hit){ pick = hit; break; }
   }
-  return pool.find(v => /natural|online|google/i.test(v.name)) || pool[0] || null;
+  if(!pick) pick = pool.find(v => /natural|online|google/i.test(v.name)) || pool[0] || null;
+  return { voice: pick, exact: exact };
 }
 function scRate(){
   const r = parseFloat(localStorage.getItem('su_chef_rate'));
@@ -61,8 +82,8 @@ function scSpeak(text){
   if(!synth) return;
   const go = () => {
     const u = new SpeechSynthesisUtterance(text);
-    const v = scResolve(synth.getVoices());
-    if(v) u.voice = v;
+    const r = scResolve(synth.getVoices());
+    if(r.voice) u.voice = r.voice;
     u.rate = scRate();
     synth.cancel();
     synth.speak(u);
@@ -73,22 +94,20 @@ function scSpeak(text){
 """
 
 
-def listen(key: str = "mic") -> str | None:
-    """Render the tap-to-speak mic; return a transcript when one arrives."""
-    try:
-        from streamlit_mic_recorder import speech_to_text
-    except Exception:
-        st.caption("🎙️ Voice input needs `streamlit-mic-recorder` — type below for now.")
-        return None
+import os
 
-    return speech_to_text(
-        language="en",
-        start_prompt="🎙️  Tap to speak",
-        stop_prompt="⏹️  Stop",
-        just_once=True,
-        use_container_width=True,
-        key=key,
-    )
+# Native mic component (webkitSpeechRecognition + waveform). Returns the latest
+# {"text": str, "t": ms} when an utterance finishes; persists across reruns, so
+# callers dedupe on "t".
+_mic_component = components.declare_component(
+    "su_chef_mic", path=os.path.join(os.path.dirname(__file__), "components", "mic")
+)
+
+
+def mic(key: str = "mic") -> dict | None:
+    """Render the tap-to-speak mic (live waveform + words). Returns the last
+    recognized {text, t} or None."""
+    return _mic_component(default=None, key=key)
 
 
 def speak(text: str) -> None:
@@ -123,35 +142,14 @@ _SETTINGS_HTML = """
 </style>
 <div class="sc-vs">
   <label>Voice</label>
-  <select id="sc-accent" onchange="scSave()">
-    <option value="auto">Auto — most natural</option>
-    <optgroup label="Free voices">
-      <option value="alan">Alan · British</option>
-      <option value="emma">Emma · British</option>
-      <option value="thomas">Thomas · American</option>
-      <option value="mia">Mia · American</option>
-      <option value="liam">Liam · Irish</option>
-      <option value="erin">Erin · Irish</option>
-      <option value="jack">Jack · Australian</option>
-      <option value="chloe">Chloe · Australian</option>
-      <option value="arjun">Arjun · Indian</option>
-      <option value="priya">Priya · Indian</option>
-    </optgroup>
-    <optgroup label="Premium — coming soon">
-      <option disabled>Gabrielle · French</option>
-      <option disabled>Hugo · French</option>
-      <option disabled>Lucia · Italian</option>
-      <option disabled>Marco · Italian</option>
-      <option disabled>Belle · Southern US</option>
-      <option disabled>Wyatt · Southern US</option>
-    </optgroup>
-  </select>
+  <select id="sc-accent" onchange="scSave()"></select>
   <div class="sc-using" id="sc-using"></div>
   <label>Speed: <span id="sc-rate-label"></span></label>
   <input id="sc-rate" type="range" min="0.7" max="1.3" step="0.05" oninput="scSaveRate()">
   <button onclick="scTest()">▶  Test voice</button>
-  <p class="sc-note">Premium voices (French, Italian, Southern US) coming soon.<br>
-  Tip: open in <b>Microsoft Edge</b> while online for the most natural voices.</p>
+  <p class="sc-note">Grayed-out accents aren't available in this browser — open the
+  app in <b>Microsoft Edge</b> (online) to use them. Premium voices (French,
+  Italian, Southern US) coming soon.</p>
 </div>
 <script>
 /*VOICE_JS*/
@@ -159,13 +157,36 @@ const acc = document.getElementById('sc-accent');
 const rate = document.getElementById('sc-rate');
 const rlabel = document.getElementById('sc-rate-label');
 const using = document.getElementById('sc-using');
-acc.value = localStorage.getItem('su_chef_accent') || 'auto';
 rate.value = scRate(); rlabel.textContent = (+rate.value).toFixed(2) + 'x';
 
+function fillAccents(){
+  const saved = localStorage.getItem('su_chef_accent') || 'james';
+  acc.innerHTML = '';
+  SC_PERSONAS.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id;
+    const ok = scAvailable(p.id);
+    o.textContent = p.name + ' · ' + p.accent + (ok ? '' : '  · needs Edge');
+    if(!ok){ o.disabled = true; o.title = 'Open app in Edge browser'; }
+    if(p.id === saved) o.selected = true;
+    acc.appendChild(o);
+  });
+  const grp = document.createElement('optgroup');
+  grp.label = 'Premium — coming soon';
+  ['Gabrielle · French','Hugo · French','Lucia · Italian','Marco · Italian',
+   'Belle · Southern US','Wyatt · Southern US'].forEach(n => {
+    const o = document.createElement('option'); o.textContent = n; o.disabled = true;
+    grp.appendChild(o);
+  });
+  acc.appendChild(grp);
+  showUsing();
+}
 function showUsing(){
-  const v = scResolve(window.speechSynthesis.getVoices());
-  using.textContent = v ? ('Using: ' + v.name.replace('Microsoft ','').replace('Google ',''))
-                        : 'No matching voice installed — using default.';
+  const r = scResolve(window.speechSynthesis.getVoices());
+  if(!r.voice){ using.textContent = 'No voice available — using browser default.'; using.style.color='#7a6a63'; return; }
+  const nm = r.voice.name.replace('Microsoft ','').replace('Google ','').replace(' Online (Natural)','');
+  if(r.exact){ using.textContent = 'Using: ' + nm; using.style.color='#56642b'; }
+  else { using.textContent = '⚠ This accent isn\\'t available here — using ' + nm + '. Open in Edge.'; using.style.color='#ba1a1a'; }
 }
 function scSave(){ localStorage.setItem('su_chef_accent', acc.value); showUsing(); }
 function scSaveRate(){
@@ -176,8 +197,8 @@ function scTest(){
   localStorage.setItem('su_chef_accent', acc.value);
   scSpeak("Hi, I'm Su Chef. This is how I'll read your answers. Let's get cooking!");
 }
-showUsing();
-window.speechSynthesis.addEventListener('voiceschanged', showUsing);
+fillAccents();
+window.speechSynthesis.addEventListener('voiceschanged', fillAccents);
 </script>
 """
 

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; padding: 0; font-family: 'Work Sans', sans-serif; }
+  #wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #mic {
+    width: 100%; min-height: 64px; border: none; border-radius: 9999px;
+    background: #944521; color: #fff; font-size: 20px; font-weight: 600;
+    cursor: pointer; transition: filter .12s ease;
+  }
+  #mic:hover { filter: brightness(0.96); }
+  #mic.listening { background: #ba1a1a; }
+  #canvas { width: 100%; height: 40px; display: none; }
+  #live {
+    width: 100%; min-height: 22px; color: #55433c; font-size: 17px;
+    text-align: center; font-style: italic;
+  }
+  #hint { color: #7a6a63; font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <button id="mic">🎙️&nbsp; Tap to speak</button>
+  <canvas id="canvas" width="600" height="40"></canvas>
+  <div id="live"></div>
+  <div id="hint"></div>
+</div>
+<script>
+// --- Streamlit component protocol (vanilla, no build) -----------------------
+function send(type, data) {
+  window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data), "*");
+}
+const Streamlit = {
+  ready: () => send("streamlit:componentReady", { apiVersion: 1 }),
+  height: (h) => send("streamlit:setFrameHeight", { height: h }),
+  value: (v) => send("streamlit:setComponentValue", { value: v, dataType: "json" }),
+};
+function fit() { Streamlit.height(document.getElementById("wrap").scrollHeight + 4); }
+
+const micBtn = document.getElementById("mic");
+const canvas = document.getElementById("canvas");
+const live = document.getElementById("live");
+const hint = document.getElementById("hint");
+const ctx = canvas.getContext("2d");
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recog = null, listening = false, finalText = "", audioCtx, analyser, rafId, stream;
+
+if (!SR) {
+  micBtn.disabled = true;
+  hint.textContent = "Voice input isn't supported in this browser — type below.";
+}
+
+function startWave() {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => {
+    stream = s;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(s);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 64;
+    src.connect(analyser);
+    canvas.style.display = "block";
+    fit();
+    draw();
+  }).catch(() => { /* no waveform if mic blocked; recognition may still work */ });
+}
+function draw() {
+  const bins = analyser.frequencyBinCount;
+  const data = new Uint8Array(bins);
+  analyser.getByteFrequencyData(data);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const bw = canvas.width / bins;
+  ctx.fillStyle = "#b35c37";
+  for (let i = 0; i < bins; i++) {
+    const h = (data[i] / 255) * canvas.height;
+    ctx.fillRect(i * bw + 1, (canvas.height - h) / 2, bw - 2, Math.max(2, h));
+  }
+  rafId = requestAnimationFrame(draw);
+}
+function stopWave() {
+  cancelAnimationFrame(rafId);
+  if (stream) stream.getTracks().forEach((t) => t.stop());
+  if (audioCtx) audioCtx.close().catch(() => {});
+  canvas.style.display = "none";
+  fit();
+}
+
+function setListening(on) {
+  listening = on;
+  micBtn.classList.toggle("listening", on);
+  micBtn.innerHTML = on ? "⏹&nbsp; Listening… tap to stop" : "🎙️&nbsp; Tap to speak";
+}
+
+function start() {
+  finalText = ""; live.textContent = ""; hint.textContent = "";
+  recog = new SR();
+  recog.lang = "en-US"; recog.interimResults = true; recog.continuous = false;
+  recog.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      if (e.results[i].isFinal) finalText += t; else interim += t;
+    }
+    live.textContent = (finalText + " " + interim).trim();
+    fit();
+  };
+  recog.onerror = (e) => { hint.textContent = "Mic error: " + e.error + " — type below."; };
+  recog.onend = () => {
+    setListening(false); stopWave();
+    const text = finalText.trim();
+    if (text) { Streamlit.value({ text: text, t: Date.now() }); live.textContent = text; }
+  };
+  try { recog.start(); setListening(true); startWave(); }
+  catch (err) { hint.textContent = "Couldn't start the mic — type below."; }
+}
+
+micBtn.addEventListener("click", () => {
+  if (listening) { try { recog.stop(); } catch (e) {} }
+  else { start(); }
+});
+
+Streamlit.ready();
+fit();
+window.addEventListener("resize", fit);
+</script>
+</body>
+</html>

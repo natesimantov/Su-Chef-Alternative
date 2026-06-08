@@ -58,14 +58,20 @@ h1, h2, h3, .sc-display {{
   border: 1px solid var(--sc-outline);
 }}
 
-/* Big search bar: chat input + text inputs as soft parchment pills */
-.stChatInput textarea, .stTextInput > div > div > input {{
+/* Big search bar: make the WRAPPER the pill so the focus border is one clean
+   rounded edge (the textarea itself stays transparent — no second border). */
+[data-testid="stChatInput"] > div {{
   border-radius: 9999px !important; background: var(--sc-card) !important;
-  border: 1px solid transparent !important; padding: 16px 24px !important;
-  font-size: 20px !important;
 }}
-.stChatInput textarea:focus, .stTextInput > div > div > input:focus {{
-  border: 2px solid var(--sc-primary) !important;
+.stChatInput textarea {{
+  border-radius: 9999px !important; background: transparent !important;
+  border: none !important; padding: 16px 24px !important; font-size: 20px !important;
+}}
+/* Text inputs (context-edit field) as soft parchment pills */
+.stTextInput > div > div {{ border-radius: 9999px !important; }}
+.stTextInput > div > div > input {{
+  border-radius: 9999px !important; background: var(--sc-card) !important;
+  border: none !important; padding: 14px 22px !important; font-size: 18px !important;
 }}
 
 /* Pulsing "listening" mic blob */
@@ -109,9 +115,9 @@ h1, h2, h3, .sc-display {{
   border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 15px;
 }}
 
-/* Context-understanding line above each answer */
+/* Context-understanding line above each answer (plain, not italic) */
 .sc-context {{
-  color: #7a6a63; font-style: italic; font-size: 16px; margin: 8px 0 6px;
+  color: #7a6a63; font-size: 16px; margin: 8px 0 6px;
 }}
 
 /* Big read-aloud button (keyed say_) on the right of the answer */
@@ -126,6 +132,7 @@ h1, h2, h3, .sc-display {{
 /* Suggested follow-up chips (Gmail Smart-Reply style, light gray) */
 [class*="st-key-sugg_"] button {{
   background: #f6f3f2 !important; color: #55433c !important; font-weight: 500 !important;
+  font-style: italic !important;
   border: 1px solid #e4e2e1 !important; text-align: left !important;
   justify-content: flex-start !important; min-height: 44px !important;
 }}
