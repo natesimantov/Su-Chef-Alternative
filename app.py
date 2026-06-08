@@ -195,16 +195,16 @@ def render_sidebar() -> None:
 # --- Main: new-chat empty state ---------------------------------------------
 
 def render_new_chat() -> None:
-    st.markdown(
-        "<h1 style='text-align:center;font-size:56px;margin:7vh 0 1vh'>"
-        "Let me help.</h1>"
-        "<p style='text-align:center;color:#55433c;font-size:18px;margin-bottom:4vh'>"
-        "Ask me anything while you cook!</p>",
-        unsafe_allow_html=True)
-
-    # One centered block: mic + a typed search bar grouped together.
+    # One centered column holds the whole group — title, subtitle, mic, and the
+    # typed search bar — so they share identical bounds and line up as a unit.
     mid = st.columns([1, 4, 1])[1]
     with mid:
+        st.markdown(
+            "<h1 style='text-align:center;font-size:clamp(34px,8vw,56px);"
+            "margin:7vh 0 1vh'>Let me help.</h1>"
+            "<p style='text-align:center;color:var(--sc-text-variant);font-size:18px;"
+            "margin-bottom:4vh'>Ask me anything while you cook!</p>",
+            unsafe_allow_html=True)
         _mic_to_ask("mic_new")
         st.markdown("<p class='sc-eyebrow' style='text-align:center;margin:8px 0'>"
                     "or type it</p>", unsafe_allow_html=True)
