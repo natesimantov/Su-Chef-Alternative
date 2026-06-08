@@ -1,73 +1,52 @@
 """Theming for the Su Chef companion.
 
-Six palettes (four light, two dark), all driven by CSS variables so the whole app
-recolors at runtime. `inject_theme(name)` sets the active palette and injects the
-CSS; `active_palette()` exposes it for the in-iframe components (voice panel, mic).
+Three cohesive warm themes — **Hearth** (light), **Dusk** (dim sepia), **Charcoal**
+(dark) — built as paired semantic tokens (every surface ships with its own
+foreground), so contrast is structural. Every text/background pair is verified
+to meet WCAG AA (4.5:1; borders 3:1). `inject_theme(name)` sets the active
+palette + injects CSS; `active_palette()` exposes it to the in-iframe components.
 
-Note: Streamlit's own widget chrome doesn't fully follow a runtime dark switch —
-the app surface, sidebar, content, buttons, inputs, and cards recolor, but a few
-native-widget internals may stay light.
+Key fix: button-internal text is forced to its paired foreground so primary
+buttons never render the page's body color on the primary background.
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
-# Each palette: surface (canvas), card, answer (answer-card bg), text,
-# text_variant, primary, on_primary, secondary, secondary_container,
-# on_secondary_container, outline, sugg_bg, sugg_border.
+# Each palette is a set of paired tokens. Keys map to semantic roles:
+#   surface/text = background/foreground · card = card · answer = elevated
+#   text_variant = muted-foreground · primary/on_primary = primary pair
+#   secondary = accent text (eyebrow) · secondary_container/on_secondary_container
+#   = soft-accent chip pair · outline = border · sugg_bg/sugg_border = chip.
 THEMES: dict[str, dict] = {
-    "Warm Hearth": {
-        "surface": "#fcf9f8", "card": "#f0eded", "answer": "#ffffff",
-        "text": "#1b1c1c", "text_variant": "#5b4a42",
-        "primary": "#9a4a23", "on_primary": "#ffffff",
-        "secondary": "#4f5d27", "secondary_container": "#d6e7a1",
-        "on_secondary_container": "#41501f", "outline": "#9c8a82",
-        "sugg_bg": "#f4efed", "sugg_border": "#e3dcd8",
+    "Hearth": {  # warm light
+        "surface": "#faf6f2", "card": "#efe7df", "answer": "#ffffff",
+        "text": "#20140d", "text_variant": "#6a564a",
+        "primary": "#b4501f", "on_primary": "#ffffff",
+        "secondary": "#51611f", "secondary_container": "#dce6bf",
+        "on_secondary_container": "#3a481c", "outline": "#94806f",
+        "sugg_bg": "#f1ebe5", "sugg_border": "#e0d5cb",
     },
-    "Herb Garden": {
-        "surface": "#f2f6ef", "card": "#e4ede0", "answer": "#ffffff",
-        "text": "#19241c", "text_variant": "#3c4a39",
-        "primary": "#2f7344", "on_primary": "#ffffff",
-        "secondary": "#9a5a22", "secondary_container": "#d7e6c4",
-        "on_secondary_container": "#3e4c16", "outline": "#7f8d7b",
-        "sugg_bg": "#edf2ea", "sugg_border": "#d9e2d3",
+    "Dusk": {  # dim sepia
+        "surface": "#e4d8c8", "card": "#d6c8b4", "answer": "#f4ede1",
+        "text": "#2c2117", "text_variant": "#5b4c3c",
+        "primary": "#a8481c", "on_primary": "#ffffff",
+        "secondary": "#4d5a1e", "secondary_container": "#c7d49a",
+        "on_secondary_container": "#38431a", "outline": "#806c57",
+        "sugg_bg": "#ded2c0", "sugg_border": "#cabda8",
     },
-    "Slate & Citrus": {
-        "surface": "#f4f6f9", "card": "#e6ecf2", "answer": "#ffffff",
-        "text": "#16202b", "text_variant": "#3a4754",
-        "primary": "#2b5a79", "on_primary": "#ffffff",
-        "secondary": "#b96412", "secondary_container": "#f6e2c4",
-        "on_secondary_container": "#7a4a0f", "outline": "#7a8794",
-        "sugg_bg": "#eef2f7", "sugg_border": "#dbe3eb",
-    },
-    "Berry": {
-        "surface": "#f9f4f7", "card": "#eee0ea", "answer": "#ffffff",
-        "text": "#271823", "text_variant": "#50394a",
-        "primary": "#8a2f5e", "on_primary": "#ffffff",
-        "secondary": "#5d7a2e", "secondary_container": "#dbe7c4",
-        "on_secondary_container": "#41501f", "outline": "#98818f",
-        "sugg_bg": "#f3eaf0", "sugg_border": "#e6d4e0",
-    },
-    "Midnight": {  # dark, warm
-        "surface": "#1b1613", "card": "#2a221d", "answer": "#332a23",
-        "text": "#f4ece5", "text_variant": "#cbbbb0",
-        "primary": "#ef9266", "on_primary": "#2a160c",
-        "secondary": "#b6cd78", "secondary_container": "#3a4a26",
-        "on_secondary_container": "#cde29a", "outline": "#7a6a60",
-        "sugg_bg": "#251d18", "sugg_border": "#3a2f28",
-    },
-    "Deep Sea": {  # dark, cool
-        "surface": "#10181b", "card": "#1c2a2e", "answer": "#24343a",
-        "text": "#e9f2f3", "text_variant": "#aec6c9",
-        "primary": "#54c2b5", "on_primary": "#03251f",
-        "secondary": "#ecae5e", "secondary_container": "#25393a",
-        "on_secondary_container": "#f0d8a8", "outline": "#50686b",
-        "sugg_bg": "#18242a", "sugg_border": "#2b3d41",
+    "Charcoal": {  # deep warm dark
+        "surface": "#16140f", "card": "#221f19", "answer": "#2a261f",
+        "text": "#f2efe9", "text_variant": "#b8b1a6",
+        "primary": "#e6a766", "on_primary": "#241502",
+        "secondary": "#b7c98a", "secondary_container": "#343a26",
+        "on_secondary_container": "#cfe0a0", "outline": "#766c5f",
+        "sugg_bg": "#201d17", "sugg_border": "#353128",
     },
 }
 THEME_NAMES = list(THEMES.keys())
-DEFAULT_THEME = "Warm Hearth"
+DEFAULT_THEME = "Hearth"
 
 _ACTIVE: dict = THEMES[DEFAULT_THEME]
 
@@ -112,6 +91,19 @@ button[kind="primary"], button[kind="primaryFormSubmit"] {{
 button[kind="secondary"], button[kind="secondaryFormSubmit"] {{
   background: var(--sc-card) !important; color: var(--sc-text) !important;
   border: 1px solid var(--sc-outline) !important; }}
+/* CRITICAL: a button's INNER markdown text must use the button's foreground,
+   not the page foreground (otherwise primary buttons show dark body text on the
+   primary background). */
+button[kind="primary"] *, button[kind="primaryFormSubmit"] *,
+[data-testid="stSegmentedControl"] button[aria-checked="true"] * {{
+  color: var(--sc-on-primary) !important; }}
+button[kind="secondary"] *, button[kind="secondaryFormSubmit"] * {{
+  color: var(--sc-text) !important; }}
+
+/* Focus-visible rings (never remove focus) */
+button:focus-visible, input:focus-visible, [role="option"]:focus-visible,
+[data-baseweb="select"]:focus-within {{
+  outline: 2px solid var(--sc-primary) !important; outline-offset: 2px !important; }}
 
 /* Search bar: the wrapper is the pill (single clean focus border) */
 [data-testid="stChatInput"] > div {{ border-radius: 9999px !important;
@@ -131,8 +123,7 @@ button[kind="secondary"], button[kind="secondaryFormSubmit"] {{
   background: var(--sc-card) !important; }}
 [data-baseweb="menu"] li, ul[role="listbox"] li {{ color: var(--sc-text) !important; }}
 [data-testid="stSegmentedControl"] button {{ color: var(--sc-text) !important; }}
-[data-testid="stSegmentedControl"] button[aria-checked="true"],
-[data-testid="stSegmentedControl"] button[kind="primary"] {{
+[data-testid="stSegmentedControl"] button[aria-checked="true"] {{
   background: var(--sc-primary) !important; color: var(--sc-on-primary) !important; }}
 
 /* Mic component wrapper (the live waveform/transcript) */
@@ -162,6 +153,11 @@ button[kind="secondary"], button[kind="secondaryFormSubmit"] {{
   color: var(--sc-text-variant) !important; font-weight: 500 !important;
   font-style: italic !important; border: 1px solid var(--sc-sugg-border) !important;
   text-align: left !important; justify-content: flex-start !important; min-height: 44px !important; }}
+[class*="st-key-sugg_"] button * {{ color: var(--sc-text-variant) !important; }}
+
+/* Pinned items in the sidebar */
+.sc-pin {{ background: var(--sc-secondary-container); color: var(--sc-on-secondary-container);
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 8px; font-size: 15px; }}
 
 /* "Su Chef is thinking…" loader */
 .sc-loader {{ display: flex; flex-direction: column; align-items: center;
@@ -173,6 +169,11 @@ button[kind="secondary"], button[kind="secondaryFormSubmit"] {{
 .sc-dots span:nth-child(2) {{ animation-delay: .2s; }}
 .sc-dots span:nth-child(3) {{ animation-delay: .4s; }}
 @keyframes sc-blink {{ 0%, 80%, 100% {{ opacity: .2; }} 40% {{ opacity: 1; }} }}
+
+/* Respect reduced-motion */
+@media (prefers-reduced-motion: reduce) {{
+  *, .sc-loader svg, .sc-dots span {{ animation: none !important; transition: none !important; }}
+}}
 </style>
 """
 
