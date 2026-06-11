@@ -1,0 +1,8 @@
+# Local pipeline deps (NOT needed by the deployed app). Install with:
+#   pip install -r requirements-dev.txt
+# Used to run the CrewAI Flow + the two crews and regenerate the 8 artifacts.
+-r requirements.txt
+crewai>=0.40
+chromadb>=0.5
+matplotlib>=3.7
+seaborn>=0.13

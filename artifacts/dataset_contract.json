@@ -1,0 +1,73 @@
+{
+  "schema": {
+    "recipe_title": "string",
+    "cuisine": "string",
+    "course": "string",
+    "diet": "string",
+    "rating": "float",
+    "vote_count": "int",
+    "prep_time_min": "float",
+    "cook_time_min": "float",
+    "total_time_min": "float",
+    "num_ingredients": "int",
+    "num_steps": "int",
+    "desc_len": "int",
+    "instr_len": "int",
+    "ingr_len": "int",
+    "time_cue_count": "int"
+  },
+  "target": "total_time_min",
+  "allowed_values": {
+    "course": [
+      "Appetizer",
+      "Brunch",
+      "Dessert",
+      "Dinner",
+      "Indian Breakfast",
+      "Lunch",
+      "Main Course",
+      "North Indian Breakfast",
+      "One Pot Dish",
+      "Side Dish",
+      "Snack",
+      "South Indian Breakfast",
+      "Unknown",
+      "World Breakfast"
+    ],
+    "diet": [
+      "Diabetic Friendly",
+      "Eggetarian",
+      "Gluten Free",
+      "High Protein Non Vegetarian",
+      "High Protein Vegetarian",
+      "No Onion No Garlic (Sattvic)",
+      "Non Vegeterian",
+      "Sugar Free Diet",
+      "Unknown",
+      "Vegan",
+      "Vegetarian"
+    ]
+  },
+  "constraints": {
+    "total_time_min": {
+      "min": 1,
+      "max": 600
+    },
+    "rating": {
+      "min": 0,
+      "max": 5
+    },
+    "num_ingredients": {
+      "min": 1
+    },
+    "num_steps": {
+      "min": 1
+    }
+  },
+  "assumptions": {
+    "time_parsing": "prep_time/cook_time like '15 M' parsed to integer minutes",
+    "counts": "num_ingredients/num_steps = count of '|'-separated entries",
+    "missing_categoricals": "cuisine/course/diet missing -> 'Unknown'"
+  },
+  "row_count": 7938
+}
