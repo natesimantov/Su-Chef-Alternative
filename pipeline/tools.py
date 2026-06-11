@@ -441,6 +441,30 @@ and compared; see `evaluation_report.md`.
     _log(f"wrote {CARD_MD.name}")
 
 
+# --- Inference helpers (used by the live app; no heavy/crewai imports) -------
+
+def load_predictor():
+    """Load the trained model bundle from artifacts/model.pkl."""
+    import joblib
+    return joblib.load(MODEL_PKL)
+
+
+def feature_defaults() -> dict:
+    """Median values for the numeric features, to fill anything the user form
+    doesn't ask for, so a prediction can be made from a few simple inputs."""
+    feats = pd.read_csv(FEATURES_CSV)
+    return {c: float(feats[c].median()) for c in NUM_FEATURES}
+
+
+def predict_quick(user_inputs: dict) -> float:
+    """Return P(recipe is quick, <= QUICK_THRESHOLD min) for the given inputs
+    (numeric features default to dataset medians; categoricals must be given)."""
+    bundle = load_predictor()
+    row = {**feature_defaults(), **user_inputs}
+    X = pd.DataFrame([{c: row.get(c) for c in bundle["features"]}])
+    return float(bundle["pipeline"].predict_proba(X)[0, 1])
+
+
 def run_all() -> dict:
     """Run the full deterministic pipeline end-to-end (used by the Flow + as a
     standalone sanity check). Returns a summary dict."""
