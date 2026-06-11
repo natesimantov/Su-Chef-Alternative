@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 MODEL = os.environ.get("SU_CHEF_MODEL", "claude-sonnet-4-6")
 
@@ -73,12 +74,36 @@ _UNITS = {
 }
 
 
+_RECIPE_HINTS = ("make ", "recipe for", "how do i make", "how to make",
+                 "i want to make", "give me a recipe", "show me how to",
+                 "cook me", "i'm making", "im making", "what's the recipe")
+
+
+def _is_recipe_request(text: str) -> bool:
+    t = (text or "").lower()
+    return any(h in t for h in _RECIPE_HINTS)
+
+
 def answer(messages: list[dict], units: str = "metric") -> dict:
-    """Return Su Chef's structured reply to the conversation so far."""
+    """Return Su Chef's structured reply to the conversation so far, grounded in
+    real recipes retrieved from our dataset (RAG). A "make me X" request returns
+    a fuller recipe plus a predicted quick/involved estimate from the model."""
+    latest = next((m["content"] for m in reversed(messages)
+                   if m["role"] == "user"), "")
+    recipe = _is_recipe_request(latest)
+    try:
+        import rag
+        grounding = rag.grounding_block(latest)
+    except Exception:
+        grounding = ""
+
     key = _api_key()
     if key:
         try:
-            return _ask_claude(messages, key, units)
+            reply = _ask_claude(messages, key, units, grounding, recipe)
+            if recipe:
+                reply["answer"] += _quick_estimate(reply["answer"])
+            return reply
         except Exception as exc:  # network/auth/etc. — degrade gracefully
             return {
                 "context": "",
@@ -86,19 +111,46 @@ def answer(messages: list[dict], units: str = "metric") -> dict:
                            f"({exc.__class__.__name__}). Try again in a moment."),
                 "follow_ups": [],
             }
-    latest = next((m["content"] for m in reversed(messages)
-                   if m["role"] == "user"), "")
     return _offline_reply(latest)
 
 
-def _ask_claude(messages: list[dict], key: str, units: str = "metric") -> dict:
+def _quick_estimate(recipe_text: str) -> str:
+    """Append a quick/involved time estimate from the trained model, based on the
+    structure of the generated recipe. Best-effort; silent on any failure."""
+    try:
+        from pipeline import tools as T
+        n_ing = sum(1 for ln in recipe_text.splitlines()
+                    if ln.strip()[:1] in ("-", "•", "*"))
+        n_steps = sum(1 for ln in recipe_text.splitlines()
+                      if re.match(r"\s*\d+[.)]", ln))
+        p = T.predict_quick({"num_ingredients": max(n_ing, 3),
+                             "num_steps": max(n_steps, 3),
+                             "cuisine": "Other", "course": "Lunch", "diet": "Unknown"})
+        verdict = "a quick one (≤45 min)" if p >= 0.5 else "more of a project (>45 min)"
+        return f"\n\n⏱ Looks like {verdict} — about {p:.0%} likely to be quick."
+    except Exception:
+        return ""
+
+
+def _ask_claude(messages: list[dict], key: str, units: str = "metric",
+                grounding: str = "", recipe: bool = False) -> dict:
     import anthropic
 
     client = anthropic.Anthropic(api_key=key)
     system = SYSTEM_PROMPT + "\n\n" + _UNITS.get(units, _UNITS["metric"])
+    if grounding:
+        system += ("\n\nGround your answer in these real recipes from our "
+                   "database when relevant; prefer them over guessing, and you "
+                   "may mention the source link.\n" + grounding)
+    if recipe:
+        system += ("\n\nThe cook wants to MAKE a dish. In `answer`, give a "
+                   "complete but tight recipe: a one-line intro, then an "
+                   "'Ingredients:' list with each item on its own line starting "
+                   "with '- ' (include amounts), then 'Steps:' as a numbered list "
+                   "(1. 2. 3.), then one short tip. Use real line breaks.")
     resp = client.messages.create(
         model=MODEL,
-        max_tokens=400,
+        max_tokens=900 if recipe else 400,
         system=system,
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],
         output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
