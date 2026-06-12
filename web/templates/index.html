@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Su Chef</title>
+</head>
+<body style="font-family: system-ui, Arial, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px;">
+  <h1 style="color:#944521;">Su Chef <small style="color:#88726b;font-size:14px;">(Flask skeleton)</small></h1>
+  <div style="display:flex; gap:8px;">
+    <input id="q" placeholder="Ask anything… e.g. make me a simple tomato pasta"
+           style="flex:1; padding:12px; border:1px solid #dbc1b8; border-radius:9999px;" />
+    <button id="go" style="padding:12px 20px; background:#944521; color:#fff; border:none; border-radius:9999px; cursor:pointer;">Ask</button>
+  </div>
+  <p id="ctx" style="color:#55433c; margin-top:18px;"></p>
+  <div id="ans" style="white-space:pre-wrap; font-size:18px; line-height:1.5; background:#fff; border-left:5px solid #944521; border-radius:12px; padding:16px 20px;"></div>
+  <div id="fu" style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;"></div>
+
+<script>
+const q = document.getElementById('q'), ans = document.getElementById('ans'),
+      ctx = document.getElementById('ctx'), fu = document.getElementById('fu');
+async function ask(text) {
+  if (!text.trim()) return;
+  ctx.textContent = ''; ans.textContent = 'Thinking…'; fu.innerHTML = '';
+  const res = await fetch('/api/ask', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ messages: [{ role: 'user', content: text }], units: 'metric' })
+  });
+  const data = await res.json();
+  ctx.textContent = data.context || '';
+  ans.textContent = data.answer || data.error || '(no answer)';
+  (data.follow_ups || []).forEach(f => {
+    const b = document.createElement('button');
+    b.textContent = f; b.style.cssText = 'padding:8px 14px;border:1px solid #dbc1b8;border-radius:9999px;background:#f6f3f2;cursor:pointer;font-style:italic;';
+    b.onclick = () => { q.value = f; ask(f); };
+    fu.appendChild(b);
+  });
+}
+document.getElementById('go').onclick = () => ask(q.value);
+q.addEventListener('keydown', e => { if (e.key === 'Enter') ask(q.value); });
+</script>
+</body>
+</html>
