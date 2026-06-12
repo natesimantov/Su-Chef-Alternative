@@ -164,6 +164,57 @@ function section(title, items, listTag) {
   s.appendChild(list); return s;
 }
 
+/* ---------- voice input: record (auto-stop on pause) -> /api/transcribe -> ask ---------- */
+const micBtn = $('mic');
+let recording = false, mediaRecorder, audioCtx, analyser, rafId, micStream, chunks = [];
+let startedAt = 0, lastVoiceAt = 0, hasSpoken = false;
+const SILENCE_MS = 2000, MAX_MS = 15000, NO_SPEECH_MS = 7000, SPEAK_RMS = 9, SILENCE_RMS = 6;
+
+micBtn.onclick = async () => {
+  if (recording) { stopRec(); return; }
+  if (!navigator.mediaDevices || !window.MediaRecorder) { qInput.placeholder = 'Voice not supported — type instead'; return; }
+  try { micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { qInput.placeholder = 'Mic blocked — type instead'; return; }
+  chunks = []; mediaRecorder = new MediaRecorder(micStream);
+  mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  mediaRecorder.onstop = finishRec; mediaRecorder.start();
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser(); analyser.fftSize = 256;
+  audioCtx.createMediaStreamSource(micStream).connect(analyser);
+  startedAt = lastVoiceAt = Date.now(); hasSpoken = false; recording = true;
+  micBtn.classList.add('listening'); monitor();
+};
+function rms() {
+  const b = new Uint8Array(analyser.fftSize); analyser.getByteTimeDomainData(b);
+  let s = 0; for (let i = 0; i < b.length; i++) { const d = b[i] - 128; s += d * d; }
+  return Math.sqrt(s / b.length);
+}
+function monitor() {
+  const now = Date.now(), lvl = rms();
+  if (lvl > SPEAK_RMS) { hasSpoken = true; lastVoiceAt = now; }
+  if (now - startedAt > MAX_MS) return stopRec();
+  if (!hasSpoken && now - startedAt > NO_SPEECH_MS) return stopRec();
+  if (hasSpoken && lvl < SILENCE_RMS && now - lastVoiceAt > SILENCE_MS) return stopRec();
+  rafId = requestAnimationFrame(monitor);
+}
+function stopRec() {
+  if (!recording) return; recording = false; cancelAnimationFrame(rafId);
+  micBtn.classList.remove('listening'); try { mediaRecorder.stop(); } catch (e) {}
+}
+async function finishRec() {
+  if (micStream) micStream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close().catch(() => {});
+  if (!hasSpoken || !chunks.length) return;
+  const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+  const fd = new FormData(); fd.append('audio', blob, 'rec.webm');
+  const ph = qInput.placeholder; qInput.placeholder = 'Transcribing…';
+  try {
+    const r = await fetch('/api/transcribe', { method: 'POST', body: fd });
+    const d = await r.json(); qInput.placeholder = ph;
+    if (d.text) ask(d.text);
+  } catch (e) { qInput.placeholder = ph; }
+}
+
 /* ---------- input wiring (#6: the always-visible composer is the follow-up field) ---------- */
 $('send').onclick = () => ask(qInput.value);
 qInput.addEventListener('keydown', e => { if (e.key === 'Enter') ask(qInput.value); });

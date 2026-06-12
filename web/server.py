@@ -54,6 +54,57 @@ def api_ask():
     return jsonify(reply)
 
 
+@app.post("/api/transcribe")
+def api_transcribe():
+    """Recorded audio blob -> text (faster-whisper, server-side)."""
+    f = request.files.get("audio")
+    if not f:
+        return jsonify({"error": "no audio"}), 400
+    import stt
+    return jsonify({"text": stt.transcribe(f.read())})
+
+
+@app.post("/api/predict")
+def api_predict():
+    """P(quick) for the Insights form. Body: numeric + categorical inputs."""
+    from pipeline import tools as T
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        p = T.predict_quick({
+            "num_ingredients": int(data.get("num_ingredients", 8)),
+            "num_steps": int(data.get("num_steps", 6)),
+            "cuisine": data.get("cuisine", "Other"),
+            "course": data.get("course", "Lunch"),
+            "diet": data.get("diet", "Unknown"),
+        })
+        return jsonify({"quick_prob": p})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.get("/insights")
+def insights_page():
+    """The data-science view: EDA report + live prediction + model card."""
+    import json
+    art = ROOT / "artifacts"
+    contract = json.loads((art / "dataset_contract.json").read_text(encoding="utf-8"))
+    return render_template(
+        "insights.html",
+        eda=(art / "eda_report.html").read_text(encoding="utf-8"),
+        model_card=(art / "model_card.md").read_text(encoding="utf-8"),
+        evaluation=(art / "evaluation_report.md").read_text(encoding="utf-8"),
+        courses=contract["allowed_values"]["course"],
+        diets=contract["allowed_values"]["diet"],
+    )
+
+
+@app.get("/insights/eda")
+def insights_eda():
+    from flask import Response
+    html = (ROOT / "artifacts" / "eda_report.html").read_text(encoding="utf-8")
+    return Response(html, mimetype="text/html")
+
+
 @app.get("/api/health")
 def health():
     return jsonify({"ok": True, "has_key": bool(os.environ.get("ANTHROPIC_API_KEY"))})
