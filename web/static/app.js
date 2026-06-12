@@ -88,8 +88,15 @@ async function ask(text) {
 }
 
 /* ---------- render (newest-first #1) ---------- */
+function updatePlaceholder() {
+  qInput.placeholder = state.messages.length > 0
+    ? 'Ask a follow-up question…'
+    : 'e.g. "out of buttermilk — what now?"';
+}
+
 function render() {
   empty.classList.toggle('hidden', state.messages.length > 0);
+  updatePlaceholder();
   // pair user+assistant into turns
   const turns = [];
   for (let i = 0; i < state.messages.length; i += 2)
@@ -155,7 +162,7 @@ function renderRecipe(r) {
   if (r.utensils && r.utensils.length) card.appendChild(section('Utensils', r.utensils, 'ul'));
   card.appendChild(section('Steps', r.steps, 'ol'));
   if (r.tip) { const s = el('div', 'sect'); s.appendChild(el('h4', '', 'Tip')); s.appendChild(el('p', '', cv(r.tip))); card.appendChild(s); }
-  if (r.source_url) { const a = document.createElement('a'); a.className = 'src'; a.href = r.source_url; a.target = '_blank'; a.textContent = 'View source recipe ↗'; card.appendChild(a); }
+  // No outbound recipe link — the recipe lives in-app (keep the cook here).
   attachAskAbout(card);
   return card;
 }

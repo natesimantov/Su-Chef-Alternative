@@ -35,7 +35,10 @@ SYSTEM_PROMPT = (
     "food-safety call, say so honestly.\n"
     "- follow_ups: 2-3 ULTRA-short follow-up chips, 2-4 words each, phrased as a "
     "quick tap (e.g. \"How long?\", \"Serve with?\", \"Too salty?\", \"Make it spicier?\"). "
-    "Keep them short enough to sit side by side."
+    "Keep them short enough to sit side by side.\n\n"
+    "NEVER write out URLs, web addresses, or 'http' links in your text — they "
+    "aren't clickable and pull the cook out of the app. If a full recipe would "
+    "help, don't paste a link; that's what the recipe button is for."
 )
 
 _SCHEMA = {
@@ -97,9 +100,12 @@ _UNITS = {
 }
 
 
-_RECIPE_HINTS = ("make ", "recipe for", "how do i make", "how to make",
-                 "i want to make", "give me a recipe", "show me how to",
-                 "cook me", "i'm making", "im making", "what's the recipe")
+_RECIPE_HINTS = ("make ", "recipe for", "recipe", "how do i make", "how to make",
+                 "how do you make", "i want to make", "i'd like to make",
+                 "id like to make", "give me a recipe", "show me how to",
+                 "teach me to make", "cook me", "let's make", "lets make",
+                 "can you make", "could you make", "what do i need to make",
+                 "i'm making", "im making", "what's the recipe")
 
 
 def _is_recipe_request(text: str) -> bool:
@@ -216,11 +222,13 @@ def _ask_claude(messages: list[dict], key: str, units: str = "metric",
     system = SYSTEM_PROMPT + "\n\n" + _UNITS.get(units, _UNITS["metric"])
     if grounding:
         system += ("\n\nGround your answer in these real recipes from our "
-                   "database when relevant; prefer them over guessing, and you "
-                   "may mention the source link.\n" + grounding)
-    system += ("\n\nIf (and only if) the cook seems to want to cook a specific dish "
-               "but hasn't asked for the full recipe, set recipe_suggestion to a "
-               "short 'Make me <dish>' phrase; otherwise leave it empty.")
+                   "database when relevant; prefer them over guessing. Do NOT paste "
+                   "URLs or recipe links in your answer.\n" + grounding)
+    system += ("\n\nIf the cook mentions a dish they could cook (or you reference a "
+               "recipe), DON'T describe a full recipe or link to one in the answer — "
+               "instead set recipe_suggestion to a short 'Make <dish>' phrase so they "
+               "can tap the recipe button and get it in-app. Otherwise leave "
+               "recipe_suggestion empty.")
     resp = client.messages.create(
         model=MODEL,
         max_tokens=400,
