@@ -80,6 +80,19 @@ h1,h2,h3,.wordmark { font-family:'Plus Jakarta Sans', sans-serif; letter-spacing
 }
 .row { display:flex; gap:8px; align-items:flex-start; }
 .row .answer { flex:1; }
+
+/* Hybrid focus (#4): latest turn stands out; older turns shrink + gently mute,
+   staying readable (no heavy transparency). */
+.turn.latest .answer, .turn.latest .recipe { box-shadow:0 6px 22px rgba(0,0,0,.12); }
+.turn.old { margin-bottom:18px; }
+.turn.old .answer {
+  font-size:16px; box-shadow:none; border-left-color:var(--outline);
+  color:color-mix(in srgb, var(--text) 60%, var(--muted));
+}
+.turn.old .recipe { box-shadow:none; }
+.turn.old .recipe h3 { font-size:20px; }
+.turn.old .q, .turn.old .ctx { font-size:14px; opacity:.85; }
+.turn.old .answer-tools { opacity:.7; }
 .answer-tools { display:flex; flex-direction:column; gap:8px; }
 .tbtn {
   width:42px; height:42px; border-radius:12px; border:1px solid var(--outline);
@@ -89,12 +102,19 @@ h1,h2,h3,.wordmark { font-family:'Plus Jakarta Sans', sans-serif; letter-spacing
 .tbtn.on { background:var(--primary); color:var(--on-primary); border-color:var(--primary); }
 
 /* --- Suggestion chips (#5) + inline follow-up (#6) --- */
-.chips { display:flex; flex-direction:column; gap:8px; margin:12px 0; }
+/* short suggestion chips, three across in one row (#1) */
+.chips { display:flex; flex-direction:row; flex-wrap:wrap; gap:8px; margin:12px 0; }
 .chip {
-  text-align:left; padding:11px 16px; border:1px solid var(--sugg-border); background:var(--sugg);
-  color:var(--muted); border-radius:12px; cursor:pointer; font-style:italic; font-size:15px;
+  flex:1 1 0; min-width:110px; text-align:center; padding:11px 12px;
+  border:1px solid var(--sugg-border); background:var(--sugg); color:var(--muted);
+  border-radius:12px; cursor:pointer; font-size:14px; font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.chip.recipe { font-style:normal; font-weight:700; color:var(--on-primary); background:var(--primary); border-color:var(--primary); }
+.chip:hover { box-shadow:0 2px 8px rgba(0,0,0,.10); }
+/* the recipe request/suggestion chip — bold + colorful (#2) */
+.chip.recipe { flex-basis:100%; min-width:100%; font-weight:800; font-size:16px;
+  color:var(--on-primary); background:var(--primary); border-color:var(--primary);
+  box-shadow:0 3px 10px rgba(0,0,0,.18); }
 .followup { display:flex; gap:8px; margin-top:6px; }
 .followup input {
   flex:1; height:48px; padding:0 18px; font-size:16px; color:var(--text);
@@ -115,5 +135,20 @@ h1,h2,h3,.wordmark { font-family:'Plus Jakarta Sans', sans-serif; letter-spacing
 .recipe ul, .recipe ol { margin:0; padding-left:22px; }
 .recipe li { margin-bottom:4px; }
 .recipe .src { display:inline-block; margin-top:12px; color:var(--primary); font-size:14px; }
+
+/* #3: "Ask about this" context menu + popover */
+.ctxmenu { background:var(--card); border:1px solid var(--outline); border-radius:10px;
+  box-shadow:0 6px 20px rgba(0,0,0,.22); overflow:hidden; }
+.ctxitem { display:block; width:100%; padding:10px 16px; border:none; background:transparent;
+  color:var(--text); font:inherit; font-weight:600; cursor:pointer; text-align:left; white-space:nowrap; }
+.ctxitem:hover { background:var(--sugg); }
+.askpop { width:270px; background:var(--card); border:1px solid var(--outline); border-radius:14px;
+  box-shadow:0 8px 28px rgba(0,0,0,.28); padding:12px; }
+.askctx { font-size:13px; color:var(--muted); margin-bottom:8px; }
+.askpop input { width:100%; height:42px; padding:0 12px; border:1px solid var(--outline);
+  border-radius:9999px; background:var(--surface); color:var(--text); font:inherit; outline:none; }
+.askpop input:focus { border-color:var(--primary); }
+.asksend { margin-top:8px; width:100%; height:40px; border:none; border-radius:9999px;
+  background:var(--primary); color:var(--on-primary); font-weight:700; cursor:pointer; }
 
 .hidden { display:none !important; }

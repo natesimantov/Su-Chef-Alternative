@@ -19,6 +19,7 @@ $('theme').onchange = (e) => applyTheme(e.target.value);
 function setUnits(u) {
   state.units = u; localStorage.setItem('units', u);
   document.querySelectorAll('#units button').forEach(b => b.classList.toggle('active', b.dataset.u === u));
+  if (typeof render === 'function' && state.messages.length) render();  // #5: re-convert temps in place
 }
 setUnits(state.units);
 document.querySelectorAll('#units button').forEach(b => b.onclick = () => setUnits(b.dataset.u));
@@ -52,7 +53,7 @@ fillVoices(); window.speechSynthesis.onvoiceschanged = fillVoices;
 
 function speak(text) {
   if (!state.audioOn || !text) return;
-  const u = new SpeechSynthesisUtterance(text);
+  const u = new SpeechSynthesisUtterance(convertTemps(text, state.units));
   const lang = $('voice').value, voices = window.speechSynthesis.getVoices();
   const v = voices.find(v => v.lang.toLowerCase().startsWith(lang)) || voices.find(v => /^en/i.test(v.lang));
   if (v) u.voice = v;
@@ -96,7 +97,7 @@ function render() {
   thread.innerHTML = '';
   turns.reverse().forEach((turn, idxFromTop) => {
     const isLatest = idxFromTop === 0;
-    const div = document.createElement('div'); div.className = 'turn';
+    const div = document.createElement('div'); div.className = 'turn ' + (isLatest ? 'latest' : 'old');
     div.appendChild(el('p', 'q', `🎙️ “${turn.q.content}”`));
     const a = turn.a || {};
     if (a.context) div.appendChild(el('p', 'ctx', a.context));
@@ -106,7 +107,7 @@ function render() {
       main = renderRecipe(a.recipe);
     } else {
       main = document.createElement('div'); main.className = a.pending ? 'answer thinking' : 'answer';
-      main.textContent = a.pending ? 'Su Chef is thinking…' : (a.content || '');
+      main.textContent = a.pending ? 'Su Chef is thinking…' : cv(a.content || '');
     }
     rowEl.appendChild(main);
     if (!a.pending) {
@@ -143,7 +144,7 @@ function chip(text, isRecipe) {
 function renderRecipe(r) {
   const card = document.createElement('div'); card.className = 'recipe';
   card.appendChild(el('h3', '', r.title || 'Recipe'));
-  if (r.intro) card.appendChild(el('p', 'ctx', r.intro));
+  if (r.intro) card.appendChild(el('p', 'ctx', cv(r.intro)));
   const meta = document.createElement('div'); meta.className = 'meta';
   if (r.servings) meta.appendChild(el('span', 'pill', `🍽 ${r.servings} servings`));
   if (r.total_time_min) meta.appendChild(el('span', 'pill', `⏱ ${r.total_time_min} min`));
@@ -153,16 +154,72 @@ function renderRecipe(r) {
   card.appendChild(section('Ingredients', r.ingredients, 'ul'));
   if (r.utensils && r.utensils.length) card.appendChild(section('Utensils', r.utensils, 'ul'));
   card.appendChild(section('Steps', r.steps, 'ol'));
-  if (r.tip) { const s = el('div', 'sect'); s.appendChild(el('h4', '', 'Tip')); s.appendChild(el('p', '', r.tip)); card.appendChild(s); }
+  if (r.tip) { const s = el('div', 'sect'); s.appendChild(el('h4', '', 'Tip')); s.appendChild(el('p', '', cv(r.tip))); card.appendChild(s); }
   if (r.source_url) { const a = document.createElement('a'); a.className = 'src'; a.href = r.source_url; a.target = '_blank'; a.textContent = 'View source recipe ↗'; card.appendChild(a); }
+  attachAskAbout(card);
   return card;
 }
 function section(title, items, listTag) {
   const s = el('div', 'sect'); s.appendChild(el('h4', '', title));
   const list = document.createElement(listTag);
-  (items || []).forEach(it => list.appendChild(el('li', '', it)));
+  (items || []).forEach(it => list.appendChild(el('li', '', cv(it))));
   s.appendChild(list); return s;
 }
+
+/* #5: live temperature conversion (exact °F<->°C) applied on render from the
+   original text, so toggling units never regenerates. Safe cases only. */
+function convertTemps(text, units) {
+  if (!text) return text;
+  const re = /(\d{2,3}(?:\.\d+)?)\s*(?:°\s*|degrees?\s*)(C|F|celsius|fahrenheit)\b/gi;
+  return text.replace(re, (m, num, unit) => {
+    const u = unit[0].toUpperCase(), n = parseFloat(num);
+    if (units === 'metric' && u === 'F') return Math.round((n - 32) * 5 / 9) + '°C';
+    if (units === 'us' && u === 'C') return Math.round(n * 9 / 5 + 32) + '°F';
+    return Math.round(n) + '°' + u;
+  });
+}
+const cv = (t) => convertTemps(t, state.units);   // shorthand used in renderers
+
+/* #3: "Ask about this" — right-click (or long-press) any recipe element. */
+function attachAskAbout(card) {
+  const open = (x, y, snippet) => { if (snippet && snippet.trim()) showAskMenu(x, y, snippet.trim()); };
+  card.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    const sel = window.getSelection().toString();
+    const snippet = sel || (e.target.closest('li,h3,h4,p,a,span') || {}).textContent || '';
+    open(e.pageX, e.pageY, snippet);
+  });
+  let lp;  // long-press for touch
+  card.addEventListener('touchstart', (e) => {
+    const t = e.target.closest('li,h3,h4,p,a,span');
+    lp = setTimeout(() => { if (t) open(e.touches[0].pageX, e.touches[0].pageY, t.textContent); }, 550);
+  }, { passive: true });
+  card.addEventListener('touchend', () => clearTimeout(lp));
+}
+function showAskMenu(x, y, snippet) {
+  closeAskUI();
+  const menu = el('div', 'ctxmenu'); menu.id = '__ctxmenu';
+  const item = el('button', 'ctxitem', '🔎 Ask about this'); menu.appendChild(item);
+  item.onclick = () => { closeAskUI(); showAskPopover(x, y, snippet); };
+  positionFloat(menu, x, y); document.body.appendChild(menu);
+  setTimeout(() => document.addEventListener('click', closeAskUI, { once: true }), 0);
+}
+function showAskPopover(x, y, snippet) {
+  const pop = el('div', 'askpop'); pop.id = '__askpop';
+  pop.appendChild(el('div', 'askctx', `About: “${snippet.slice(0, 80)}”`));
+  const inp = document.createElement('input'); inp.type = 'text';
+  inp.placeholder = 'What do you want to know?'; pop.appendChild(inp);
+  const go = el('button', 'asksend', 'Ask'); pop.appendChild(go);
+  const submit = () => { const q = inp.value.trim(); closeAskUI(); if (q) ask(`About "${snippet}": ${q}`); };
+  go.onclick = submit; inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  positionFloat(pop, x, y); document.body.appendChild(pop); inp.focus();
+}
+function positionFloat(node, x, y) {
+  node.style.position = 'absolute'; node.style.zIndex = 200;
+  node.style.left = Math.min(x, window.innerWidth - 280) + 'px';
+  node.style.top = (y + 6) + 'px';
+}
+function closeAskUI() { ['__ctxmenu', '__askpop'].forEach(id => { const n = document.getElementById(id); if (n) n.remove(); }); }
 
 /* ---------- voice input: record (auto-stop on pause) -> /api/transcribe -> ask ---------- */
 const micBtn = $('mic');

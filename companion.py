@@ -33,8 +33,9 @@ SYSTEM_PROMPT = (
     "personality, but never longer than needed — brevity matters at the stove. Be "
     "decisive; briefly say why when it helps. If you truly don't know or it's a "
     "food-safety call, say so honestly.\n"
-    "- follow_ups: 2-3 very short likely next questions, phrased the way the cook "
-    "would say them (e.g. \"How long do I cook it?\")."
+    "- follow_ups: 2-3 ULTRA-short follow-up chips, 2-4 words each, phrased as a "
+    "quick tap (e.g. \"How long?\", \"Serve with?\", \"Too salty?\", \"Make it spicier?\"). "
+    "Keep them short enough to sit side by side."
 )
 
 _SCHEMA = {
@@ -172,11 +173,13 @@ def _build_recipe(messages: list[dict], key: str, units: str, grounding: str) ->
         system += ("\n\nBase the recipe on these real recipes from our database; "
                    "prefer them over inventing, and set source_url to the one you "
                    "drew on.\n" + grounding)
-    system += ("\n\nThe cook wants to MAKE a dish. Fill the structured recipe: a "
-               "short title, a one-line intro, servings, your best total_time_min "
+    system += ("\n\nThe cook wants to MAKE a dish. Honor anything they said earlier "
+               "in the conversation (servings, diet, allergies, dislikes, equipment, "
+               "skill level) — use the FULL chat context. Fill the structured recipe: "
+               "a short title, a one-line intro, servings, your best total_time_min "
                "estimate, ingredients (each as 'amount item'), the utensils needed, "
-               "clear numbered steps, an optional tip, and source_url if used. Also "
-               "a friendly one-line context and 2-3 follow_ups.")
+               "clear numbered steps, an optional tip, and source_url if used. Also a "
+               "friendly one-line context and 2-3 ultra-short (2-4 word) follow_ups.")
     resp = client.messages.create(
         model=MODEL, max_tokens=1100, system=system,
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],
