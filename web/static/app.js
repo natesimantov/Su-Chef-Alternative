@@ -76,7 +76,7 @@ async function ask(text) {
     const a = state.messages[state.messages.length - 1];
     a.pending = false; a.content = data.answer || data.error || '(no answer)';
     a.context = data.context || ''; a.follow_ups = (data.follow_ups || []).slice(0, 3);
-    a.recipe_suggestion = data.recipe_suggestion || '';
+    a.recipe_suggestion = data.recipe_suggestion || ''; a.recipe = data.recipe || null;
     render();
     speak(a.content);
   } catch (e) {
@@ -101,9 +101,14 @@ function render() {
     const a = turn.a || {};
     if (a.context) div.appendChild(el('p', 'ctx', a.context));
     const rowEl = document.createElement('div'); rowEl.className = 'row';
-    const ans = document.createElement('div'); ans.className = a.pending ? 'answer thinking' : 'answer';
-    ans.textContent = a.pending ? 'Su Chef is thinking…' : (a.content || '');
-    rowEl.appendChild(ans);
+    let main;
+    if (!a.pending && a.recipe) {
+      main = renderRecipe(a.recipe);
+    } else {
+      main = document.createElement('div'); main.className = a.pending ? 'answer thinking' : 'answer';
+      main.textContent = a.pending ? 'Su Chef is thinking…' : (a.content || '');
+    }
+    rowEl.appendChild(main);
     if (!a.pending) {
       const tools = document.createElement('div'); tools.className = 'answer-tools';
       const say = tbtn('volume_up', () => speak(a.content));
@@ -132,6 +137,31 @@ function tbtn(icon, fn) {
 function chip(text, isRecipe) {
   const b = document.createElement('button'); b.className = 'chip' + (isRecipe ? ' recipe' : '');
   b.textContent = (isRecipe ? '🍳 ' : '') + text; b.onclick = () => ask(text); return b;
+}
+
+/* recipe widget (#3): segmented Ingredients / Utensils / Time / Portions / Steps */
+function renderRecipe(r) {
+  const card = document.createElement('div'); card.className = 'recipe';
+  card.appendChild(el('h3', '', r.title || 'Recipe'));
+  if (r.intro) card.appendChild(el('p', 'ctx', r.intro));
+  const meta = document.createElement('div'); meta.className = 'meta';
+  if (r.servings) meta.appendChild(el('span', 'pill', `🍽 ${r.servings} servings`));
+  if (r.total_time_min) meta.appendChild(el('span', 'pill', `⏱ ${r.total_time_min} min`));
+  if (r.quick_prob != null)
+    meta.appendChild(el('span', 'pill quick', (r.quick_prob >= 0.5 ? 'Quick' : 'Involved') + ` · ${Math.round(r.quick_prob*100)}%`));
+  card.appendChild(meta);
+  card.appendChild(section('Ingredients', r.ingredients, 'ul'));
+  if (r.utensils && r.utensils.length) card.appendChild(section('Utensils', r.utensils, 'ul'));
+  card.appendChild(section('Steps', r.steps, 'ol'));
+  if (r.tip) { const s = el('div', 'sect'); s.appendChild(el('h4', '', 'Tip')); s.appendChild(el('p', '', r.tip)); card.appendChild(s); }
+  if (r.source_url) { const a = document.createElement('a'); a.className = 'src'; a.href = r.source_url; a.target = '_blank'; a.textContent = 'View source recipe ↗'; card.appendChild(a); }
+  return card;
+}
+function section(title, items, listTag) {
+  const s = el('div', 'sect'); s.appendChild(el('h4', '', title));
+  const list = document.createElement(listTag);
+  (items || []).forEach(it => list.appendChild(el('li', '', it)));
+  s.appendChild(list); return s;
 }
 
 /* ---------- input wiring (#6: the always-visible composer is the follow-up field) ---------- */

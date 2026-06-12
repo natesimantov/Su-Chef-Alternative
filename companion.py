@@ -43,8 +43,30 @@ _SCHEMA = {
         "context": {"type": "string"},
         "answer": {"type": "string"},
         "follow_ups": {"type": "array", "items": {"type": "string"}},
+        "recipe_suggestion": {"type": "string"},
     },
     "required": ["context", "answer", "follow_ups"],
+    "additionalProperties": False,
+}
+
+# Structured recipe (the recipe widget). Claude fills this for "make me X".
+_RECIPE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "context": {"type": "string"},
+        "title": {"type": "string"},
+        "intro": {"type": "string"},
+        "servings": {"type": "integer"},
+        "total_time_min": {"type": "integer"},
+        "ingredients": {"type": "array", "items": {"type": "string"}},
+        "utensils": {"type": "array", "items": {"type": "string"}},
+        "steps": {"type": "array", "items": {"type": "string"}},
+        "tip": {"type": "string"},
+        "source_url": {"type": "string"},
+        "follow_ups": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["context", "title", "intro", "servings", "total_time_min",
+                 "ingredients", "utensils", "steps", "follow_ups"],
     "additionalProperties": False,
 }
 
@@ -98,42 +120,93 @@ def answer(messages: list[dict], units: str = "metric") -> dict:
         grounding = ""
 
     key = _api_key()
-    if key:
-        try:
-            reply = _ask_claude(messages, key, units, grounding, recipe)
-            if recipe:
-                reply["answer"] += _quick_estimate(reply["answer"])
-            return reply
-        except Exception as exc:  # network/auth/etc. — degrade gracefully
-            return {
-                "context": "",
-                "answer": (f"I hit a snag reaching my brain "
-                           f"({exc.__class__.__name__}). Try again in a moment."),
-                "follow_ups": [],
-            }
-    return _offline_reply(latest)
+    if not key:
+        return _offline_reply(latest)
+    try:
+        if recipe:
+            return _build_recipe(messages, key, units, grounding)
+        return _ask_claude(messages, key, units, grounding)
+    except Exception as exc:  # network/auth/etc. — degrade gracefully
+        return {
+            "context": "",
+            "answer": (f"I hit a snag reaching my brain "
+                       f"({exc.__class__.__name__}). Try again in a moment."),
+            "follow_ups": [],
+        }
 
 
-def _quick_estimate(recipe_text: str) -> str:
-    """Append a quick/involved time estimate from the trained model, based on the
-    structure of the generated recipe. Best-effort; silent on any failure."""
+def _predict_quick_prob(n_ingredients: int, n_steps: int) -> float | None:
+    """P(quick) from the trained model, given the recipe's size. None on failure."""
     try:
         from pipeline import tools as T
-        n_ing = sum(1 for ln in recipe_text.splitlines()
-                    if ln.strip()[:1] in ("-", "•", "*"))
-        n_steps = sum(1 for ln in recipe_text.splitlines()
-                      if re.match(r"\s*\d+[.)]", ln))
-        p = T.predict_quick({"num_ingredients": max(n_ing, 3),
-                             "num_steps": max(n_steps, 3),
-                             "cuisine": "Other", "course": "Lunch", "diet": "Unknown"})
-        verdict = "a quick one (≤45 min)" if p >= 0.5 else "more of a project (>45 min)"
-        return f"\n\n⏱ Looks like {verdict} — about {p:.0%} likely to be quick."
+        return T.predict_quick({"num_ingredients": max(n_ingredients, 3),
+                                "num_steps": max(n_steps, 3), "cuisine": "Other",
+                                "course": "Lunch", "diet": "Unknown"})
     except Exception:
-        return ""
+        return None
+
+
+def _format_recipe_text(r: dict) -> str:
+    """Render a structured recipe to plain text (for Streamlit / read-aloud)."""
+    lines = [r.get("intro", ""), "", "Ingredients:"]
+    lines += [f"- {i}" for i in r.get("ingredients", [])]
+    if r.get("utensils"):
+        lines += ["", "You'll need: " + ", ".join(r["utensils"])]
+    lines += ["", "Steps:"]
+    lines += [f"{n}. {s}" for n, s in enumerate(r.get("steps", []), 1)]
+    if r.get("tip"):
+        lines += ["", "Tip: " + r["tip"]]
+    p = r.get("quick_prob")
+    if p is not None:
+        verdict = "a quick one (≤45 min)" if p >= 0.5 else "more of a project (>45 min)"
+        lines += ["", f"⏱ Looks like {verdict} — about {p:.0%} likely to be quick."]
+    return "\n".join(lines).strip()
+
+
+def _build_recipe(messages: list[dict], key: str, units: str, grounding: str) -> dict:
+    """Produce a STRUCTURED recipe (the recipe widget) + a text fallback answer."""
+    import anthropic
+    client = anthropic.Anthropic(api_key=key)
+    system = SYSTEM_PROMPT + "\n\n" + _UNITS.get(units, _UNITS["metric"])
+    if grounding:
+        system += ("\n\nBase the recipe on these real recipes from our database; "
+                   "prefer them over inventing, and set source_url to the one you "
+                   "drew on.\n" + grounding)
+    system += ("\n\nThe cook wants to MAKE a dish. Fill the structured recipe: a "
+               "short title, a one-line intro, servings, your best total_time_min "
+               "estimate, ingredients (each as 'amount item'), the utensils needed, "
+               "clear numbered steps, an optional tip, and source_url if used. Also "
+               "a friendly one-line context and 2-3 follow_ups.")
+    resp = client.messages.create(
+        model=MODEL, max_tokens=1100, system=system,
+        messages=[{"role": m["role"], "content": m["content"]} for m in messages],
+        output_config={"format": {"type": "json_schema", "schema": _RECIPE_SCHEMA}},
+    )
+    data = json.loads("".join(b.text for b in resp.content if b.type == "text"))
+    recipe = {
+        "title": data.get("title", "").strip(),
+        "intro": data.get("intro", "").strip(),
+        "servings": data.get("servings"),
+        "total_time_min": data.get("total_time_min"),
+        "ingredients": [str(i) for i in data.get("ingredients", [])],
+        "utensils": [str(u) for u in data.get("utensils", [])],
+        "steps": [str(s) for s in data.get("steps", [])],
+        "tip": data.get("tip", "").strip(),
+        "source_url": data.get("source_url", "").strip(),
+    }
+    recipe["quick_prob"] = _predict_quick_prob(len(recipe["ingredients"]),
+                                               len(recipe["steps"]))
+    fu = [s for s in data.get("follow_ups", []) if isinstance(s, str)][:3]
+    return {
+        "context": data.get("context", "").strip(),
+        "answer": _format_recipe_text(recipe),
+        "follow_ups": fu,
+        "recipe": recipe,
+    }
 
 
 def _ask_claude(messages: list[dict], key: str, units: str = "metric",
-                grounding: str = "", recipe: bool = False) -> dict:
+                grounding: str = "") -> dict:
     import anthropic
 
     client = anthropic.Anthropic(api_key=key)
@@ -142,15 +215,12 @@ def _ask_claude(messages: list[dict], key: str, units: str = "metric",
         system += ("\n\nGround your answer in these real recipes from our "
                    "database when relevant; prefer them over guessing, and you "
                    "may mention the source link.\n" + grounding)
-    if recipe:
-        system += ("\n\nThe cook wants to MAKE a dish. In `answer`, give a "
-                   "complete but tight recipe: a one-line intro, then an "
-                   "'Ingredients:' list with each item on its own line starting "
-                   "with '- ' (include amounts), then 'Steps:' as a numbered list "
-                   "(1. 2. 3.), then one short tip. Use real line breaks.")
+    system += ("\n\nIf (and only if) the cook seems to want to cook a specific dish "
+               "but hasn't asked for the full recipe, set recipe_suggestion to a "
+               "short 'Make me <dish>' phrase; otherwise leave it empty.")
     resp = client.messages.create(
         model=MODEL,
-        max_tokens=900 if recipe else 400,
+        max_tokens=400,
         system=system,
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],
         output_config={"format": {"type": "json_schema", "schema": _SCHEMA}},
@@ -162,6 +232,7 @@ def _ask_claude(messages: list[dict], key: str, units: str = "metric",
         "context": data.get("context", "").strip(),
         "answer": data.get("answer", "").strip(),
         "follow_ups": fu,
+        "recipe_suggestion": data.get("recipe_suggestion", "").strip(),
     }
 
 
