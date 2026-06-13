@@ -15,7 +15,7 @@
     <div class="brand">Su&nbsp;Chef<span class="dot">.</span></div>
     <nav class="mnav">
       <a data-view="chat" class="active material-symbols-outlined" title="Chat">forum</a>
-      <a data-view="recipebox" class="material-symbols-outlined" title="Recipe Box">menu_book</a>
+      <a data-view="history" class="material-symbols-outlined" title="History">history</a>
       <a data-view="insights" class="material-symbols-outlined" title="Insights">insights</a>
       <a data-view="prefs" class="material-symbols-outlined" title="Preferences">settings</a>
     </nav>
@@ -27,7 +27,7 @@
       <nav class="nav">
         <a data-view="chat" data-home="1" class="active"><span class="material-symbols-outlined">home</span>Home</a>
         <a data-view="chat"><span class="material-symbols-outlined">forum</span>Kitchen Chat</a>
-        <a data-view="recipebox"><span class="material-symbols-outlined">menu_book</span>Recipe Box</a>
+        <a data-view="history"><span class="material-symbols-outlined">history</span>History</a>
         <a data-view="insights"><span class="material-symbols-outlined">insights</span>Chef Insights</a>
       </nav>
       <div class="sidebar-foot">
@@ -38,6 +38,10 @@
     </aside>
 
     <main class="content">
+      <div class="topctrls">
+        <button class="ctrlbtn" id="newTop" title="Start a new chat"><span class="material-symbols-outlined">add</span>New</button>
+        <button class="ctrlbtn on" id="audioToggle" title="Read answers aloud"><span class="material-symbols-outlined">volume_up</span>Audio</button>
+      </div>
       <div class="wrap">
 
         <!-- Kitchen Chat / Home -->
@@ -55,10 +59,10 @@
           <div id="thread" class="thread"></div>
         </section>
 
-        <!-- Recipe Box -->
-        <section id="v-recipebox" class="view">
-          <div class="eyebrow">Saved</div>
-          <h1 class="serif" style="font-size:40px;margin:0 0 18px;">Recipe Box</h1>
+        <!-- History -->
+        <section id="v-history" class="view">
+          <div class="eyebrow">Saved &amp; recent</div>
+          <h1 class="serif" style="font-size:40px;margin:0 0 18px;">History</h1>
           <div class="card"><div class="label">Pinned answers &amp; recipes</div><div id="pins-list"></div></div>
           <div class="card"><div class="label">Recent questions</div><div id="recent-list"></div></div>
         </section>
@@ -91,7 +95,7 @@
             <div class="field"><span class="label">Units</span>
               <div class="seg" id="units"><button data-u="metric" class="active">°C</button><button data-u="us">°F</button></div>
             </div>
-            <div class="field"><span class="label">Theme</span>
+            <div class="field"><span class="label">Display mode</span>
               <select id="theme" style="max-width:240px;height:46px;border:1px solid var(--outline);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 12px;">
                 <option value="archive">Modern Archive (light)</option>
                 <option value="nocturnal">Nocturnal Hearth (dark)</option>
@@ -100,10 +104,6 @@
             <div class="field"><span class="label">Voice / accent</span>
               <select id="voice" style="max-width:280px;height:46px;border:1px solid var(--outline);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 12px;"></select>
             </div>
-            <div class="field"><span class="label">Read answers aloud</span><br>
-              <button class="toggle on" id="audioToggle"><span class="material-symbols-outlined">volume_up</span>Audio on</button>
-            </div>
-            <div class="field"><button class="toggle" id="newBtn"><span class="material-symbols-outlined">add</span>New conversation</button></div>
           </div>
         </section>
 

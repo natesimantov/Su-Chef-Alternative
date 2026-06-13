@@ -27,8 +27,11 @@ SYSTEM_PROMPT = (
     "seasoned chef standing right at the cook's side. They are mid-cooking and ask "
     "short, practical questions, often mentioning what they're making.\n\n"
     "Reply with three things:\n"
-    "- context: ONE short, friendly line showing you understood, e.g. \"Sounds like "
-    "you're making a tomato sauce and need a pan tip.\" One sentence, no more.\n"
+    "- context: ONE short, DRY, factual line restating the situation, e.g. "
+    "\"Choosing a pan for a tomato sauce.\" or \"Out of buttermilk for pancakes.\" "
+    "No exclamation points, no praise (never \"great question\", \"good idea\", "
+    "\"classic\"), no enthusiasm, no em dashes. Just plainly state what they're "
+    "doing. One sentence, no more.\n"
     "- answer: 1-3 SHORT spoken sentences. Warm and encouraging with a light touch of "
     "personality, but never longer than needed — brevity matters at the stove. Be "
     "decisive; briefly say why when it helps. If you truly don't know or it's a "
@@ -198,7 +201,9 @@ def _build_recipe(messages: list[dict], key: str, units: str, grounding: str) ->
                "friendly one-line context and 2-3 ultra-short (2-4 word) follow_ups. "
                "Also give a rough PER-SERVING nutrition estimate (calories, protein_g, "
                "carbs_g, fat_g, and if you can fiber_g, sugar_g, sodium_mg) — these are "
-               "estimates, not exact.")
+               "estimates, not exact. The context line must be DRY and factual "
+               "(e.g. \"Recipe for paneer butter masala for 4.\") — no exclamation "
+               "points, no praise, no enthusiasm, no em dashes.")
     resp = client.messages.create(
         model=MODEL, max_tokens=1100, system=system,
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],

@@ -15,7 +15,7 @@ const thread = $('thread'), empty = $('empty'), qInput = $('q');
 function showView(v) {
   document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.id === 'v-' + v));
   document.querySelectorAll('[data-view]').forEach(a => a.classList.toggle('active', a.dataset.view === v));
-  if (v === 'recipebox') renderBox();
+  if (v === 'history') renderBox();
   if (v === 'insights') loadInsights();
 }
 document.querySelectorAll('[data-view]').forEach(a =>
@@ -42,7 +42,7 @@ function setAudio(on) {
 }
 setAudio(state.audioOn);
 if ($('audioToggle')) $('audioToggle').onclick = () => setAudio(!state.audioOn);
-if ($('newBtn')) $('newBtn').onclick = () => { state.messages = []; render(); window.speechSynthesis.cancel(); showView('chat'); qInput.focus(); };
+if ($('newTop')) $('newTop').onclick = () => { state.messages = []; render(); window.speechSynthesis.cancel(); showView('chat'); qInput.focus(); };
 
 /* voice persona list */
 function fillVoices() {
@@ -112,8 +112,8 @@ function render() {
     if (!a.pending) {
       const tools = el('div', 'answer-tools');
       tools.appendChild(tbtn('volume_up', () => speak(a.content)));
-      const pinned = isPinned(turn.q.content);
-      const pin = tbtn(pinned ? 'bookmark' : 'bookmark_border', (b) => { togglePin(turn); b.querySelector('span').textContent = isPinned(turn.q.content) ? 'bookmark' : 'bookmark_border'; });
+      const pin = tbtn('push_pin', (b) => { togglePin(turn); b.classList.toggle('pinned', isPinned(turn.q.content)); });
+      if (isPinned(turn.q.content)) pin.classList.add('pinned');
       tools.appendChild(pin); row.appendChild(tools);
     }
     div.appendChild(row);
