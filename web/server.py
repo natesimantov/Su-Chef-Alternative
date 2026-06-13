@@ -54,6 +54,41 @@ def api_ask():
     return jsonify(reply)
 
 
+_TTS_VOICES = {
+    "en": "en-US-AriaNeural", "en-us": "en-US-AriaNeural",
+    "en-gb": "en-GB-SoniaNeural", "en-ie": "en-IE-EmilyNeural",
+    "en-au": "en-AU-NatashaNeural", "en-in": "en-IN-NeerjaNeural",
+}
+
+
+@app.post("/api/tts")
+def api_tts():
+    """Text -> high-quality neural speech (edge-tts), returned as MP3 so any
+    browser can play it. Body: {text, lang}."""
+    import asyncio
+    import io
+    import edge_tts
+    data = request.get_json(force=True, silent=True) or {}
+    text = (data.get("text") or "").strip()
+    voice = _TTS_VOICES.get(data.get("lang", "en"), _TTS_VOICES["en"])
+    if not text:
+        return jsonify({"error": "no text"}), 400
+
+    async def synth():
+        buf = io.BytesIO()
+        async for ch in edge_tts.Communicate(text, voice).stream():
+            if ch["type"] == "audio":
+                buf.write(ch["data"])
+        return buf.getvalue()
+
+    try:
+        audio = asyncio.run(synth())
+        from flask import Response
+        return Response(audio, mimetype="audio/mpeg")
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 502
+
+
 @app.post("/api/transcribe")
 def api_transcribe():
     """Recorded audio blob -> text (faster-whisper, server-side)."""

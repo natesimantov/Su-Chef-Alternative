@@ -10,6 +10,7 @@ const state = {
 };
 const $ = (id) => document.getElementById(id);
 const thread = $('thread'), empty = $('empty'), qInput = $('q');
+let currentAudio = null;
 
 /* ---------- view switching ---------- */
 function showView(v) {
@@ -38,7 +39,7 @@ function setAudio(on) {
   const t = $('audioToggle'); if (!t) return;
   t.classList.toggle('on', on);
   t.innerHTML = `<span class="material-symbols-outlined">${on ? 'volume_up' : 'volume_off'}</span>${on ? 'Audio on' : 'Audio off'}`;
-  if (!on) window.speechSynthesis.cancel();
+  if (!on) stopSpeak();
 }
 setAudio(state.audioOn);
 if ($('audioToggle')) $('audioToggle').onclick = () => setAudio(!state.audioOn);
@@ -46,24 +47,39 @@ if ($('newTop')) $('newTop').onclick = () => { state.messages = []; render(); wi
 
 /* voice persona list */
 function fillVoices() {
-  const sel = $('voice'); if (!sel) return;
-  const voices = window.speechSynthesis.getVoices();
-  const want = [['James — default','en'],['British','en-gb'],['American','en-us'],['Irish','en-ie'],['Australian','en-au'],['Indian','en-in']];
-  sel.innerHTML = '';
-  want.forEach(([label, lang]) => {
-    const ok = lang === 'en' || voices.some(v => v.lang.toLowerCase().startsWith(lang));
-    const o = document.createElement('option'); o.value = lang; o.textContent = label + (ok ? '' : ' · needs Edge'); o.disabled = !ok;
-    sel.appendChild(o);
-  });
+  const sel = $('voice'); if (!sel || sel.options.length) return;
+  // Synthesis happens server-side (edge-tts), so every accent works in any browser.
+  [['Default voice', 'en'], ['British', 'en-gb'], ['American', 'en-us'],
+   ['Irish', 'en-ie'], ['Australian', 'en-au'], ['Indian', 'en-in']]
+    .forEach(([label, lang]) => sel.appendChild(new Option(label, lang)));
 }
-fillVoices(); window.speechSynthesis.onvoiceschanged = fillVoices;
-function speak(text) {
+fillVoices();
+
+function stopSpeak() {
+  if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
+  try { window.speechSynthesis.cancel(); } catch (e) {}
+}
+async function speak(text) {
   if (!state.audioOn || !text) return;
-  const u = new SpeechSynthesisUtterance(convertTemps(text, state.units));
-  const lang = ($('voice') || {}).value || 'en', voices = window.speechSynthesis.getVoices();
-  const v = voices.find(x => x.lang.toLowerCase().startsWith(lang)) || voices.find(x => /^en/i.test(x.lang));
-  if (v) u.voice = v;
-  window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+  stopSpeak();
+  const lang = ($('voice') || {}).value || 'en';
+  const clean = convertTemps(text, state.units);
+  try {
+    const res = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, lang }) });
+    if (!res.ok) throw new Error('tts');
+    const a = new Audio(URL.createObjectURL(await res.blob()));
+    currentAudio = a;
+    a.play().catch(() => fallbackSpeak(clean, lang));
+  } catch (e) { fallbackSpeak(clean, lang); }
+}
+function fallbackSpeak(text, lang) {
+  try {
+    const u = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const v = voices.find(x => x.lang.toLowerCase().startsWith(lang)) || voices.find(x => /^en/i.test(x.lang));
+    if (v) u.voice = v;
+    window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+  } catch (e) {}
 }
 
 /* ---------- ask flow ---------- */
