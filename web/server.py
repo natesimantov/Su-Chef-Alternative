@@ -98,6 +98,20 @@ def insights_page():
     )
 
 
+@app.get("/api/insights")
+def api_insights():
+    """Data for the Insights view: model card text + the predict form's options."""
+    import json
+    art = ROOT / "artifacts"
+    contract = json.loads((art / "dataset_contract.json").read_text(encoding="utf-8"))
+    return jsonify({
+        "model_card": (art / "model_card.md").read_text(encoding="utf-8"),
+        "evaluation": (art / "evaluation_report.md").read_text(encoding="utf-8"),
+        "courses": contract["allowed_values"]["course"],
+        "diets": contract["allowed_values"]["diet"],
+    })
+
+
 @app.get("/insights/eda")
 def insights_eda():
     from flask import Response

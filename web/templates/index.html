@@ -1,52 +1,115 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="hearth">
+<html lang="en" data-theme="archive">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Su Chef</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0,0&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Public+Sans:wght@400;500;600;700&family=Hanken+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
 <link href="{{ url_for('static', filename='app.css') }}" rel="stylesheet" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="wordmark" id="home" title="New question">Su&nbsp;Chef</div>
-    <div class="controls">
-      <button class="ctrl" id="newBtn"><span class="material-symbols-outlined">add</span>New</button>
-      <button class="ctrl" id="insightsBtn"><span class="material-symbols-outlined">bar_chart</span>Insights</button>
-      <div class="seg" id="units">
-        <button data-u="metric" class="active">°C</button>
-        <button data-u="us">°F</button>
-      </div>
-      <label class="ctrl"><span class="material-symbols-outlined">palette</span>
-        <select id="theme">
-          <option value="hearth">Hearth</option>
-          <option value="dusk">Dusk</option>
-          <option value="charcoal">Charcoal</option>
-        </select>
-      </label>
-      <label class="ctrl"><span class="material-symbols-outlined">record_voice_over</span>
-        <select id="voice"></select>
-      </label>
-      <button class="ctrl toggle on" id="audioToggle" title="Read answers aloud">
-        <span class="material-symbols-outlined">volume_up</span>Audio
-      </button>
-    </div>
-  </header>
+  <!-- Mobile top bar -->
+  <div class="mtop">
+    <div class="brand">Su&nbsp;Chef<span class="dot">.</span></div>
+    <nav class="mnav">
+      <a data-view="chat" class="active material-symbols-outlined" title="Chat">forum</a>
+      <a data-view="recipebox" class="material-symbols-outlined" title="Recipe Box">menu_book</a>
+      <a data-view="insights" class="material-symbols-outlined" title="Insights">insights</a>
+      <a data-view="prefs" class="material-symbols-outlined" title="Preferences">settings</a>
+    </nav>
+  </div>
 
-  <main class="wrap">
-    <div id="empty" class="empty">
-      <h1>Let me help.</h1>
-      <p>Ask me anything while you cook!</p>
-    </div>
-    <div class="composer">
-      <button id="mic" class="iconbtn" title="Tap to speak"><span class="material-symbols-outlined">mic</span></button>
-      <input id="q" type="text" placeholder='e.g. "out of buttermilk — what now?"' autocomplete="off" />
-      <button id="send" class="send">Ask</button>
-    </div>
-    <div id="thread"></div>
-  </main>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">Su&nbsp;Chef<span class="dot">.</span></div>
+      <nav class="nav">
+        <a data-view="chat" data-home="1" class="active"><span class="material-symbols-outlined">home</span>Home</a>
+        <a data-view="chat"><span class="material-symbols-outlined">forum</span>Kitchen Chat</a>
+        <a data-view="recipebox"><span class="material-symbols-outlined">menu_book</span>Recipe Box</a>
+        <a data-view="insights"><span class="material-symbols-outlined">insights</span>Chef Insights</a>
+      </nav>
+      <div class="sidebar-foot">
+        <nav class="nav">
+          <a data-view="prefs"><span class="material-symbols-outlined">settings</span>Preferences</a>
+        </nav>
+      </div>
+    </aside>
+
+    <main class="content">
+      <div class="wrap">
+
+        <!-- Kitchen Chat / Home -->
+        <section id="v-chat" class="view active">
+          <div id="empty" class="hero">
+            <div class="eyebrow">Your kitchen companion</div>
+            <h1>What are we cooking?</h1>
+            <p class="sub">Ask anything while you cook — by voice or text — and I'll answer, build recipes, and keep you company.</p>
+          </div>
+          <div class="composer">
+            <button id="mic" class="iconbtn" title="Tap to speak"><span class="material-symbols-outlined">mic</span></button>
+            <input id="q" type="text" placeholder='e.g. "out of buttermilk — what now?"' autocomplete="off" />
+            <button id="send" class="send">Ask</button>
+          </div>
+          <div id="thread" class="thread"></div>
+        </section>
+
+        <!-- Recipe Box -->
+        <section id="v-recipebox" class="view">
+          <div class="eyebrow">Saved</div>
+          <h1 class="serif" style="font-size:40px;margin:0 0 18px;">Recipe Box</h1>
+          <div class="card"><div class="label">Pinned answers &amp; recipes</div><div id="pins-list"></div></div>
+          <div class="card"><div class="label">Recent questions</div><div id="recent-list"></div></div>
+        </section>
+
+        <!-- Chef Insights -->
+        <section id="v-insights" class="view">
+          <div class="eyebrow">Performance overview</div>
+          <h1 class="serif" style="font-size:44px;margin:0 0 18px;">Your Culinary Journey</h1>
+          <div class="card">
+            <div class="label">Will this recipe be quick?</div>
+            <div class="grid2" style="margin-top:12px;">
+              <label class="field"><span class="label">Ingredients</span><input id="pi" type="number" value="8" min="1" max="40"></label>
+              <label class="field"><span class="label">Steps</span><input id="ps" type="number" value="6" min="1" max="40"></label>
+              <label class="field"><span class="label">Course</span><select id="pcourse"></select></label>
+              <label class="field"><span class="label">Diet</span><select id="pdiet"></select></label>
+            </div>
+            <button id="predict" class="send" style="margin-top:6px;">Predict</button>
+            <p id="predict-result" style="font-size:20px;margin-top:14px;"></p>
+          </div>
+          <div class="card"><div class="label">Exploratory analysis</div>
+            <iframe class="eda" src="/insights/eda" style="margin-top:12px;"></iframe></div>
+          <div class="card"><div class="label">Model card</div><div id="modelcard" class="md" style="margin-top:10px;"></div></div>
+        </section>
+
+        <!-- Preferences -->
+        <section id="v-prefs" class="view">
+          <div class="eyebrow">Settings</div>
+          <h1 class="serif" style="font-size:40px;margin:0 0 18px;">Preferences</h1>
+          <div class="card">
+            <div class="field"><span class="label">Units</span>
+              <div class="seg" id="units"><button data-u="metric" class="active">°C</button><button data-u="us">°F</button></div>
+            </div>
+            <div class="field"><span class="label">Theme</span>
+              <select id="theme" style="max-width:240px;height:46px;border:1px solid var(--outline);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 12px;">
+                <option value="archive">Modern Archive (light)</option>
+                <option value="nocturnal">Nocturnal Hearth (dark)</option>
+              </select>
+            </div>
+            <div class="field"><span class="label">Voice / accent</span>
+              <select id="voice" style="max-width:280px;height:46px;border:1px solid var(--outline);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 12px;"></select>
+            </div>
+            <div class="field"><span class="label">Read answers aloud</span><br>
+              <button class="toggle on" id="audioToggle"><span class="material-symbols-outlined">volume_up</span>Audio on</button>
+            </div>
+            <div class="field"><button class="toggle" id="newBtn"><span class="material-symbols-outlined">add</span>New conversation</button></div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
 
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>

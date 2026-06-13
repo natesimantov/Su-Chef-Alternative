@@ -68,6 +68,16 @@ _RECIPE_SCHEMA = {
         "tip": {"type": "string"},
         "source_url": {"type": "string"},
         "follow_ups": {"type": "array", "items": {"type": "string"}},
+        "nutrition": {
+            "type": "object",
+            "properties": {
+                "calories": {"type": "integer"}, "protein_g": {"type": "integer"},
+                "carbs_g": {"type": "integer"}, "fat_g": {"type": "integer"},
+                "fiber_g": {"type": "integer"}, "sugar_g": {"type": "integer"},
+                "sodium_mg": {"type": "integer"},
+            },
+            "additionalProperties": False,
+        },
     },
     "required": ["context", "title", "intro", "servings", "total_time_min",
                  "ingredients", "utensils", "steps", "follow_ups"],
@@ -185,7 +195,10 @@ def _build_recipe(messages: list[dict], key: str, units: str, grounding: str) ->
                "a short title, a one-line intro, servings, your best total_time_min "
                "estimate, ingredients (each as 'amount item'), the utensils needed, "
                "clear numbered steps, an optional tip, and source_url if used. Also a "
-               "friendly one-line context and 2-3 ultra-short (2-4 word) follow_ups.")
+               "friendly one-line context and 2-3 ultra-short (2-4 word) follow_ups. "
+               "Also give a rough PER-SERVING nutrition estimate (calories, protein_g, "
+               "carbs_g, fat_g, and if you can fiber_g, sugar_g, sodium_mg) — these are "
+               "estimates, not exact.")
     resp = client.messages.create(
         model=MODEL, max_tokens=1100, system=system,
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],
@@ -202,6 +215,7 @@ def _build_recipe(messages: list[dict], key: str, units: str, grounding: str) ->
         "steps": [str(s) for s in data.get("steps", [])],
         "tip": data.get("tip", "").strip(),
         "source_url": data.get("source_url", "").strip(),
+        "nutrition": data.get("nutrition") or None,
     }
     recipe["quick_prob"] = _predict_quick_prob(len(recipe["ingredients"]),
                                                len(recipe["steps"]))
