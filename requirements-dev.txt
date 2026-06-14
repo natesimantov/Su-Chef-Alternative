@@ -1,0 +1,13 @@
+# Local + pipeline deps (NOT needed by the deployed Flask app). Install with:
+#   pip install -r requirements-dev.txt
+# Covers the CrewAI Flow, the parallel Streamlit app, and voice input.
+-r requirements.txt
+streamlit>=1.40         # the parallel Streamlit UI (app.py)
+streamlit-js-eval>=0.1.7
+faster-whisper>=1.0     # voice input / speech-to-text (heavy: torch)
+crewai>=0.40
+chromadb>=0.5
+matplotlib>=3.7
+seaborn>=0.13
+huggingface_hub>=0.23   # download the recipes-with-nutrition dataset
+pyarrow>=15             # parquet support for dataset I/O

@@ -41,6 +41,7 @@ def _init_state() -> None:
     st.session_state.setdefault("pending_speak", None)
     st.session_state.setdefault("theme_ctrl", theme.DEFAULT_THEME)
     st.session_state.setdefault("units_ctrl", "Metric °C")
+    st.session_state.setdefault("show_insights", False)
 
 
 def _new_chat() -> None:
@@ -204,6 +205,10 @@ def render_sidebar() -> None:
 
         st.markdown("<hr style='margin:16px 0;border:none;border-top:1px solid "
                     "#dbc1b8'>", unsafe_allow_html=True)
+        if st.button("📊  Recipe insights", key="open_insights",
+                     use_container_width=True):
+            st.session_state["show_insights"] = True
+            st.rerun()
         with st.expander("🔊  Voice & accent"):
             voice.voice_settings()
 
@@ -358,6 +363,76 @@ def _top_controls() -> None:
                      label_visibility="collapsed")
 
 
+# --- Main: Recipe Insights (the data-science layer, surfaced on demand) ------
+
+_ARTIFACTS = __import__("pathlib").Path(__file__).resolve().parent / "artifacts"
+
+
+def render_insights() -> None:
+    """Show the data project behind Su Chef: EDA charts, a live 'quick recipe?'
+    prediction from the trained model, and the model card. Reached from the
+    sidebar; the default screen stays the cooking companion."""
+    import json
+    import streamlit.components.v1 as components
+
+    if st.button("←  Back to cooking", key="close_insights"):
+        st.session_state["show_insights"] = False
+        st.rerun()
+    st.markdown('<div class="sc-wordmark">Recipe Insights</div>',
+                unsafe_allow_html=True)
+    st.markdown("<p class='sc-context'>The data project behind Su Chef — built by "
+                "a two-crew CrewAI pipeline over ~8,000 recipes.</p>",
+                unsafe_allow_html=True)
+
+    # 1) Live prediction from the trained model
+    st.markdown("<p class='sc-eyebrow'>Will this recipe be quick?</p>",
+                unsafe_allow_html=True)
+    try:
+        contract = json.loads((_ARTIFACTS / "dataset_contract.json").read_text(
+            encoding="utf-8"))
+        courses = contract["allowed_values"]["course"]
+        diets = contract["allowed_values"]["diet"]
+    except Exception:
+        courses, diets = ["Lunch", "Dinner", "Snack", "Dessert"], ["Vegetarian"]
+    with st.form("predict_quick"):
+        c1, c2 = st.columns(2)
+        with c1:
+            n_ing = st.number_input("Number of ingredients", 1, 40, 8)
+            course = st.selectbox("Course", courses)
+        with c2:
+            n_steps = st.number_input("Number of steps", 1, 40, 6)
+            diet = st.selectbox("Diet", diets)
+        cuisine = st.selectbox("Cuisine", ["Indian", "Continental", "Italian",
+                               "Mexican", "Chinese", "Other"])
+        if st.form_submit_button("Predict", type="primary",
+                                 use_container_width=True):
+            from pipeline import tools as T
+            try:
+                p = T.predict_quick({"num_ingredients": n_ing, "num_steps": n_steps,
+                                     "cuisine": cuisine, "course": course, "diet": diet})
+                verdict = "Quick (≤45 min)" if p >= 0.5 else "More involved (>45 min)"
+                st.success(f"**{verdict}** — {p:.0%} likely quick.")
+            except Exception as exc:
+                st.warning(f"Prediction unavailable: {exc}")
+
+    # 2) EDA report
+    st.markdown("<p class='sc-eyebrow' style='margin-top:18px'>Exploratory data "
+                "analysis</p>", unsafe_allow_html=True)
+    eda = _ARTIFACTS / "eda_report.html"
+    if eda.exists():
+        components.html(eda.read_text(encoding="utf-8"), height=560, scrolling=True)
+    else:
+        st.caption("Run the pipeline to generate the EDA report.")
+
+    # 3) Model card + evaluation
+    for label, fname in [("Model card", "model_card.md"),
+                         ("Evaluation report", "evaluation_report.md")]:
+        path = _ARTIFACTS / fname
+        if path.exists():
+            with st.expander(label):
+                st.markdown(path.read_text(encoding="utf-8"))
+
+
 def main() -> None:
     st.set_page_config(page_title="Su Chef", page_icon="🍳", layout="centered")
     _init_state()
@@ -366,6 +441,9 @@ def main() -> None:
     _top_controls()
 
     render_sidebar()
+    if st.session_state.get("show_insights"):
+        render_insights()
+        return
     chat = st.session_state.get("active_chat")
     if chat is None:
         render_new_chat()

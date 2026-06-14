@@ -151,7 +151,8 @@ button[kind="segmented_controlActive"] {{ background: var(--sc-primary) !importa
 /* Answer card */
 .sc-answer {{ background: var(--sc-answer); border-left: 5px solid var(--sc-primary);
   border-radius: 12px; padding: 22px 26px; font-size: 22px; line-height: 1.5;
-  color: var(--sc-text); box-shadow: 0 2px 12px rgba(0,0,0,.07); }}
+  color: var(--sc-text); box-shadow: 0 2px 12px rgba(0,0,0,.07);
+  white-space: pre-wrap; }}
 .sc-question {{ color: var(--sc-text-variant); font-size: 17px; margin-bottom: 6px;
   font-style: italic; }}
 .sc-eyebrow {{ color: var(--sc-secondary); font-weight: 600; letter-spacing: 0.05em;
