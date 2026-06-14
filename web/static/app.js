@@ -397,12 +397,29 @@ function renderFit(fit) {
 }
 
 /* ---------- About (estimator + model card) ---------- */
+function mdToHtml(md) {
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  let html = '', inList = false;
+  const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
+  (md || '').split('\n').forEach(raw => {
+    const line = raw.trimEnd();
+    if (/^###\s+/.test(line)) { closeList(); html += '<h4>' + inline(line.replace(/^###\s+/, '')) + '</h4>'; }
+    else if (/^##\s+/.test(line)) { closeList(); html += '<h3>' + inline(line.replace(/^##\s+/, '')) + '</h3>'; }
+    else if (/^#\s+/.test(line)) { closeList(); html += '<h2>' + inline(line.replace(/^#\s+/, '')) + '</h2>'; }
+    else if (/^[-*]\s+/.test(line)) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(line.replace(/^[-*]\s+/, '')) + '</li>'; }
+    else if (line === '') { closeList(); }
+    else { closeList(); html += '<p>' + inline(line) + '</p>'; }
+  });
+  closeList();
+  return html;
+}
 let aboutLoaded = false;
 async function loadAbout() {
   if (aboutLoaded) return; aboutLoaded = true;
   try {
     const d = await (await fetch('/api/insights')).json();
-    $('about-modelcard').textContent = d.model_card || '';
+    $('about-modelcard').innerHTML = mdToHtml(d.model_card || '');
   } catch (e) {}
   const frame = $('eda-frame'), det = frame && frame.closest('details');
   if (det) det.addEventListener('toggle', () => { if (det.open && !frame.src && frame.dataset.src) frame.src = frame.dataset.src; });

@@ -58,6 +58,21 @@ def write_dataset_contract() -> str:
     return f"Wrote dataset_contract.json ({len(c['schema'])} columns, target {c['target']})"
 
 
+@tool("validate_dataset")
+def validate_dataset() -> str:
+    """Validate the cleaned dataset against the data contract (and the engineered
+    features, if already built) before modelling. Returns a pass/fail report."""
+    df = pd.read_csv(T.CLEAN_CSV)
+    contract = json.loads(T.CONTRACT_JSON.read_text(encoding="utf-8"))
+    problems = T.validate_clean_against_contract(df, contract)
+    if T.FEATURES_CSV.exists():
+        problems += T.validate_features(pd.read_csv(T.FEATURES_CSV))
+    if problems:
+        return "VALIDATION FAILED: " + "; ".join(problems)
+    return (f"Validation passed: clean_data matches the contract "
+            f"({len(df)} rows, target {contract['target']}).")
+
+
 @tool("engineer_features")
 def engineer_features() -> str:
     """Read cleaned data, build the modelling table (ingredient text + structure
@@ -121,6 +136,12 @@ def analyst_crew() -> Crew:
 
 def scientist_crew() -> Crew:
     llm = _llm()
+    validator = Agent(role="Data Validator",
+                      goal="Guarantee the cleaned data obeys the data contract "
+                           "before any modelling begins.",
+                      backstory="A QA-minded data scientist who refuses to model "
+                                "on inputs that violate the contract.",
+                      tools=[validate_dataset], llm=llm, verbose=False)
     engineer = Agent(role="Feature Engineer",
                      goal="Turn cleaned recipes into model-ready features.",
                      backstory="An ML engineer who crafts features that capture "
@@ -132,6 +153,10 @@ def scientist_crew() -> Crew:
                     backstory="A pragmatic data scientist who values honest "
                               "metrics and clear model cards.",
                     tools=[train_and_compare_models], llm=llm, verbose=False)
+    t0 = Task(description="Use the validate_dataset tool to confirm the cleaned "
+                          "dataset matches the data contract before modelling.",
+              expected_output="A validation pass/fail report.",
+              agent=validator)
     t1 = Task(description="Use the engineer_features tool to build features.csv "
                           "from the cleaned data.",
               expected_output="Confirmation that features.csv was written.",
@@ -141,5 +166,5 @@ def scientist_crew() -> Crew:
                           "mean for the business.",
               expected_output="A short explanation of the model comparison.",
               agent=trainer)
-    return Crew(agents=[engineer, trainer], tasks=[t1, t2],
+    return Crew(agents=[validator, engineer, trainer], tasks=[t0, t1, t2],
                 process=Process.sequential, memory=False, verbose=False)

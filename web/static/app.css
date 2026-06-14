@@ -168,7 +168,15 @@ a { color:inherit; }
 .field input, .field select { width:100%; height:46px; padding:0 12px; border:1px solid var(--outline);
   border-radius:10px; background:var(--surface); color:var(--ink); font:inherit; }
 iframe.eda { width:100%; height:560px; border:1px solid var(--hairline); border-radius:14px; background:#fff; }
-.md { white-space:pre-wrap; font-family:'Public Sans',sans-serif; font-size:15px; line-height:1.6; }
+.md { font-family:'Public Sans',sans-serif; font-size:15px; line-height:1.65; color:var(--ink); }
+.md h2 { font-family:'EB Garamond',serif; font-size:26px; margin:0 0 10px; }
+.md h3 { font-family:'Hanken Grotesk',sans-serif; text-transform:uppercase; letter-spacing:0.06em;
+  font-size:13px; font-weight:700; color:var(--accent); margin:20px 0 8px; }
+.md h4 { font-family:'Hanken Grotesk',sans-serif; font-size:14px; font-weight:700; margin:14px 0 6px; }
+.md p { margin:0 0 12px; color:var(--muted); }
+.md ul { margin:0 0 14px; padding-left:20px; }
+.md li { margin:4px 0; color:var(--muted); }
+.md strong { color:var(--ink); font-weight:700; }
 .boxlink { display:block; padding:16px 0; border-bottom:1px solid var(--hairline); cursor:pointer; }
 .boxlink:hover .t { color:var(--accent); }
 .boxlink .t { font-family:'EB Garamond',serif; font-size:20px; }

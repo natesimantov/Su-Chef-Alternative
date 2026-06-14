@@ -35,6 +35,10 @@ _load_key()
 import companion  # noqa: E402  (after sys.path + key setup)
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
+# Dev ergonomics: pick up template edits without a restart (Jinja caches templates
+# when debug is off). Harmless in production.
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.jinja_env.auto_reload = True
 
 
 @app.route("/")
