@@ -155,15 +155,36 @@ def answer(messages: list[dict], units: str = "metric") -> dict:
         }
 
 
-def _predict_quick_prob(n_ingredients: int, n_steps: int) -> float | None:
-    """P(quick) from the trained model, given the recipe's size. None on failure."""
+def _model_nutrition(recipe: dict) -> dict | None:
+    """Trained-model per-serving nutrition estimate, used as a cross-check."""
     try:
         from pipeline import tools as T
-        return T.predict_quick({"num_ingredients": max(n_ingredients, 3),
-                                "num_steps": max(n_steps, 3), "cuisine": "Other",
-                                "course": "Lunch", "diet": "Unknown"})
+        ings = recipe.get("ingredients", []) or []
+        return T.estimate_nutrition({
+            "ingredients": ings,
+            "num_ingredients": len(ings),
+            "servings": recipe.get("servings") or None,
+            "course": recipe.get("course") or None,
+        })
     except Exception:
         return None
+
+
+def _macro_fit(targets: dict, nut: dict | None) -> dict | None:
+    """Compare a recipe's per-serving nutrition against the cook's targets."""
+    if not targets or not nut:
+        return None
+    tol = {"calories": 0.15, "protein_g": 0.2, "carbs_g": 0.25, "fat_g": 0.25}
+    metrics, on_target = [], True
+    for k, t in tol.items():
+        tgt, val = targets.get(k), nut.get(k)
+        if tgt and val is not None:
+            ok = abs(val - tgt) <= t * tgt
+            metrics.append({"key": k, "target": tgt, "value": val, "ok": bool(ok)})
+            on_target = on_target and ok
+    if not metrics:
+        return None
+    return {"metrics": metrics, "on_target": on_target}
 
 
 def _format_recipe_text(r: dict) -> str:
@@ -176,14 +197,16 @@ def _format_recipe_text(r: dict) -> str:
     lines += [f"{n}. {s}" for n, s in enumerate(r.get("steps", []), 1)]
     if r.get("tip"):
         lines += ["", "Tip: " + r["tip"]]
-    p = r.get("quick_prob")
-    if p is not None:
-        verdict = "a quick one (≤45 min)" if p >= 0.5 else "more of a project (>45 min)"
-        lines += ["", f"⏱ Looks like {verdict} — about {p:.0%} likely to be quick."]
+    n = r.get("nutrition")
+    if n and n.get("calories"):
+        lines += ["", f"Per serving (est.): {n.get('calories')} kcal, "
+                  f"{n.get('protein_g', '?')} g protein, {n.get('carbs_g', '?')} g "
+                  f"carbs, {n.get('fat_g', '?')} g fat."]
     return "\n".join(lines).strip()
 
 
-def _build_recipe(messages: list[dict], key: str, units: str, grounding: str) -> dict:
+def _build_recipe(messages: list[dict], key: str, units: str, grounding: str,
+                  extra_directive: str = "") -> dict:
     """Produce a STRUCTURED recipe (the recipe widget) + a text fallback answer."""
     import anthropic
     client = anthropic.Anthropic(api_key=key)
@@ -204,6 +227,8 @@ def _build_recipe(messages: list[dict], key: str, units: str, grounding: str) ->
                "estimates, not exact. The context line must be DRY and factual "
                "(e.g. \"Recipe for paneer butter masala for 4.\") — no exclamation "
                "points, no praise, no enthusiasm, no em dashes.")
+    if extra_directive:
+        system += "\n\n" + extra_directive
     resp = client.messages.create(
         model=MODEL, max_tokens=1100, system=system,
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],
@@ -222,8 +247,7 @@ def _build_recipe(messages: list[dict], key: str, units: str, grounding: str) ->
         "source_url": data.get("source_url", "").strip(),
         "nutrition": data.get("nutrition") or None,
     }
-    recipe["quick_prob"] = _predict_quick_prob(len(recipe["ingredients"]),
-                                               len(recipe["steps"]))
+    recipe["nutrition_model"] = _model_nutrition(recipe)
     fu = [s for s in data.get("follow_ups", []) if isinstance(s, str)][:3]
     return {
         "context": data.get("context", "").strip(),
@@ -231,6 +255,63 @@ def _build_recipe(messages: list[dict], key: str, units: str, grounding: str) ->
         "follow_ups": fu,
         "recipe": recipe,
     }
+
+
+def build_macro_recipe(targets: dict | None = None, diets: list[str] | None = None,
+                       course: str | None = None, query: str | None = None,
+                       units: str = "metric") -> dict:
+    """Recipe Lab: generate a custom recipe aimed at per-serving macro targets +
+    diets + course, seeded by an optional text query. Returns the recipe (with
+    Claude's quantity-based nutrition), a trained-model cross-check, and a fit-to-
+    target summary."""
+    key = _api_key()
+    if not key:
+        return {"error": "no_key", "answer": "Add an ANTHROPIC_API_KEY to generate recipes."}
+    targets = targets or {}
+    diets = diets or []
+    seed = (query or "").strip()
+    try:
+        import rag
+        grounding = rag.grounding_block(
+            seed or " ".join([course or ""] + diets).strip())
+    except Exception:
+        grounding = ""
+
+    goal = []
+    for k, lab in (("calories", "kcal"), ("protein_g", "g protein"),
+                   ("carbs_g", "g carbs"), ("fat_g", "g fat")):
+        if targets.get(k):
+            goal.append(f"~{targets[k]} {lab}")
+    bits = []
+    if seed:
+        bits.append(f"theme/ingredient focus: {seed}")
+    if course and course != "Any":
+        bits.append(f"course: {course}")
+    if diets:
+        bits.append("must comply with diets: " + ", ".join(diets))
+    if goal:
+        bits.append("per-serving nutrition targets: " + ", ".join(goal))
+    user = "Create a single recipe. " + ("; ".join(bits) if bits else "Cook's choice.")
+    directive = (
+        "This request comes from Recipe Lab: the cook set per-serving nutrition "
+        "targets and constraints. Respect the diets STRICTLY (use no disallowed "
+        "ingredients). Aim to land the per-serving nutrition as close to the "
+        "targets as possible; if a target is not achievable, get close and note "
+        "the trade-off in one calm line in the intro. Pick sensible servings.")
+    try:
+        reply = _build_recipe([{"role": "user", "content": user}], key, units,
+                              grounding, extra_directive=directive)
+    except Exception as exc:
+        return {"error": exc.__class__.__name__,
+                "answer": "I hit a snag building that recipe. Try again in a moment."}
+
+    recipe = reply.get("recipe", {})
+    if course and course != "Any":
+        recipe["course"] = course
+        recipe["nutrition_model"] = _model_nutrition(recipe)
+    reply["fit"] = _macro_fit(targets, recipe.get("nutrition"))
+    reply["targets"] = targets
+    return reply
 
 
 def _ask_claude(messages: list[dict], key: str, units: str = "metric",

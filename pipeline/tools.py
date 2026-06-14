@@ -1,13 +1,14 @@
 """Deterministic data tools for the Su Chef pipeline.
 
 These are plain, reproducible Python functions (the real data work). The CrewAI
-crews in crew1.py / crew2.py call these as tools, so the heavy lifting stays
-deterministic and reproducible while the agents orchestrate and write the
-narrative reports.
+crews in crews.py call these as tools, so the heavy lifting stays deterministic
+and reproducible while the agents orchestrate and write the narrative reports.
 
-Pipeline target: predict a recipe's TOTAL TIME (minutes) from its attributes.
-(The dataset's `rating` is near-constant — mean 4.89, std 0.08 — so it carries
-almost no signal; total time has real, useful variance. See insights.md.)
+Pipeline target: estimate a recipe's PER-SERVING NUTRITION (calories, protein,
+carbs, fat) from its ingredients and structure. The model is trained on ~39k
+recipes with real, computed nutrition (Edamam "recipes-with-nutrition"). In the
+app the model is the learned estimator shown in About and a cross-check on
+generated recipes; real recipes always display their measured nutrition.
 
 All randomness is seeded (SEED) for reproducibility.
 """
@@ -23,10 +24,15 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+try:  # stable import path for the pickled densifier (see _sk.py)
+    from . import _sk
+except ImportError:  # pragma: no cover - when run as a bare script
+    import _sk
+
 SEED = 42
 
 _ROOT = Path(__file__).resolve().parent.parent
-DATASET = _ROOT / "dataset" / "food_recipes.csv"
+DATASET = _ROOT / "dataset" / "recipes_nutrition.csv"
 ARTIFACTS = _ROOT / "artifacts"
 
 CLEAN_CSV = ARTIFACTS / "clean_data.csv"
@@ -38,73 +44,148 @@ MODEL_PKL = ARTIFACTS / "model.pkl"
 EVAL_MD = ARTIFACTS / "evaluation_report.md"
 CARD_MD = ARTIFACTS / "model_card.md"
 
-TARGET = "total_time_min"        # the continuous variable we analyse in EDA
-MODEL_TARGET = "is_quick"        # what the model predicts: quick (<=45 min) or not
-QUICK_THRESHOLD = 45             # minutes; gives a balanced ~60/40 split
+# What the model predicts: per-serving nutrition (multi-output regression).
+TARGETS = ["calories", "protein_g", "carbs_g", "fat_g"]
+TEXT_FEATURE = "ingredient_text"
+NUM_FEATURES = ["num_ingredients", "servings"]
+CAT_FEATURES = ["course", "cuisine"]
 TOP_CUISINES = 15  # keep the most common cuisines; bucket the rest as "Other"
-NUM_FEATURES = ["num_ingredients", "num_steps", "desc_len", "vote_count",
-                "instr_len", "ingr_len", "time_cue_count"]
-CAT_FEATURES = ["cuisine", "course", "diet"]
 
-# Words in the instructions that signal a long process (drive total time up).
-TIME_CUES = ["overnight", "marinat", "soak", "refrigerat", "chill", "ferment",
-             "rise", "proof", "rest ", "slow", "pressure", "simmer", "roast",
-             "bake", "knead", "freeze", "set aside", "cool", "boil", "steam"]
+# Curated diets shown in Recipe Lab -> the boolean column that flags each.
+# (High-Protein / Low-Carb are intentionally omitted: the Recipe Lab protein and
+# carb target fields already cover those. Keto is a ratio-based pattern a single
+# slider can't express, so it earns a chip.)
+CURATED_DIETS = {
+    "Vegetarian": "is_vegetarian",
+    "Vegan": "is_vegan",
+    "Gluten-Free": "is_gluten_free",
+    "Dairy-Free": "is_dairy_free",
+    "Keto": "is_keto",
+}
 
+# Course selector options (canonical labels derived from dish/meal type).
+COURSES = ["Main", "Breakfast", "Dessert", "Snack", "Appetizer", "Soup",
+           "Salad", "Side", "Bread", "Drink"]
 
-def _time_cue_count(text: str) -> int:
-    t = str(text).lower()
-    return sum(t.count(cue) for cue in TIME_CUES)
+# Edamam total_nutrients keys -> our per-recipe columns.
+_NUTRIENT_KEYS = {"calories_total": None, "protein_g": "PROCNT", "carbs_g": "CHOCDF",
+                  "fat_g": "FAT", "fiber_g": "FIBTG", "sugar_g": "SUGAR",
+                  "sodium_mg": "NA"}
 
 
 def _log(msg: str) -> None:
     print(f"[pipeline] {msg}", flush=True)
 
 
+# --- small parsers for the dataset's JSON-ish string fields ------------------
+
+def _as_list(val) -> list[str]:
+    """Parse a JSON list string like '["a","b"]' into a Python list."""
+    if isinstance(val, list):
+        return val
+    if not isinstance(val, str) or not val.strip():
+        return []
+    try:
+        out = json.loads(val)
+        return out if isinstance(out, list) else []
+    except Exception:
+        return []
+
+
+def _nutrient(val, key: str) -> float:
+    try:
+        return float(json.loads(val).get(key, {}).get("quantity"))
+    except Exception:
+        return np.nan
+
+
+def _first(lst, default="Other") -> str:
+    return str(lst[0]).strip().title() if lst else default
+
+
+_DISH_TO_COURSE = {
+    "main course": "Main", "sandwiches": "Main", "pasta": "Main",
+    "desserts": "Dessert", "biscuits and cookies": "Dessert",
+    "salad": "Salad", "soup": "Soup", "starter": "Appetizer",
+    "condiments and sauces": "Side", "side dish": "Side",
+    "bread": "Bread", "pancake": "Breakfast", "cereals": "Breakfast",
+    "egg": "Breakfast", "drinks": "Drink", "alcohol cocktail": "Drink",
+}
+
+
+def _course(dish: list[str], meal: list[str]) -> str:
+    for d in dish:
+        c = _DISH_TO_COURSE.get(str(d).strip().lower())
+        if c:
+            return c
+    m = " ".join(meal).lower()
+    if "breakfast" in m or "brunch" in m:
+        return "Breakfast"
+    if "snack" in m or "teatime" in m:
+        return "Snack"
+    if "lunch" in m or "dinner" in m:
+        return "Main"
+    return "Main"
+
+
 # --- Crew 1: load + clean ----------------------------------------------------
 
-def _parse_minutes(val) -> float:
-    """'15 M' -> 15.0 ; '' / NaN -> NaN."""
-    if pd.isna(val):
-        return np.nan
-    m = re.search(r"\d+", str(val))
-    return float(m.group()) if m else np.nan
-
-
 def load_and_clean() -> pd.DataFrame:
-    """Load the raw Kaggle recipe CSV and produce a clean, typed dataframe.
-    Writes artifacts/clean_data.csv. Deterministic."""
+    """Load the raw nutrition recipe CSV and produce a clean, typed dataframe
+    with per-serving nutrition + diet/course tags. Writes artifacts/clean_data.csv."""
     ARTIFACTS.mkdir(exist_ok=True)
-    raw = pd.read_csv(DATASET)
+    raw = pd.read_csv(DATASET, low_memory=False)
     _log(f"loaded raw: {raw.shape[0]} rows")
+
     df = pd.DataFrame()
-    df["recipe_title"] = raw["recipe_title"].astype(str).str.strip()
-    df["cuisine"] = raw["cuisine"].fillna("Unknown").astype(str).str.strip()
-    df["course"] = raw["course"].fillna("Unknown").astype(str).str.strip()
-    df["diet"] = raw["diet"].fillna("Unknown").astype(str).str.strip()
-    df["rating"] = pd.to_numeric(raw["rating"], errors="coerce")
-    df["vote_count"] = pd.to_numeric(raw["vote_count"], errors="coerce").fillna(0).astype(int)
-    df["prep_time_min"] = raw["prep_time"].map(_parse_minutes)
-    df["cook_time_min"] = raw["cook_time"].map(_parse_minutes)
-    df["total_time_min"] = df["prep_time_min"].fillna(0) + df["cook_time_min"].fillna(0)
-    # counts from the "|"-separated fields
-    df["num_ingredients"] = (raw["ingredients"].fillna("")
-                             .map(lambda s: len([x for x in str(s).split("|") if x.strip()])))
-    df["num_steps"] = (raw["instructions"].fillna("")
-                       .map(lambda s: len([x for x in str(s).split("|") if x.strip()])))
-    df["desc_len"] = raw["description"].fillna("").map(lambda s: len(str(s)))
-    df["ingredients"] = raw["ingredients"].fillna("").astype(str)
-    df["instructions"] = raw["instructions"].fillna("").astype(str)
-    df["instr_len"] = df["instructions"].map(len)
-    df["ingr_len"] = df["ingredients"].map(len)
-    df["time_cue_count"] = df["instructions"].map(_time_cue_count)
+    df["recipe_name"] = raw["recipe_name"].astype(str).str.strip()
     df["url"] = raw["url"].fillna("").astype(str)
+    df["image_url"] = raw.get("image_url", pd.Series([""] * len(raw))).fillna("").astype(str)
+    df["servings"] = pd.to_numeric(raw["servings"], errors="coerce")
+
+    ing_lists = raw["ingredient_lines"].map(_as_list)
+    df["ingredient_lines"] = ing_lists.map(lambda l: json.dumps(l, ensure_ascii=False))
+    df["ingredient_text"] = ing_lists.map(lambda l: " ".join(l))
+    df["num_ingredients"] = ing_lists.map(len)
+
+    health = raw["health_labels"].map(_as_list).map(lambda l: {str(x) for x in l})
+    diet_l = raw["diet_labels"].map(_as_list).map(lambda l: {str(x) for x in l})
+    df["cuisine"] = raw["cuisine_type"].map(_as_list).map(_first)
+    df["course"] = [
+        _course(_as_list(d), _as_list(m))
+        for d, m in zip(raw["dish_type"], raw["meal_type"])
+    ]
+
+    # per-recipe nutrition, then per serving
+    total_cal = pd.to_numeric(raw["calories"], errors="coerce")
+    df["calories"] = total_cal / df["servings"]
+    for col, key in _NUTRIENT_KEYS.items():
+        if key is None:
+            continue
+        df[col] = raw["total_nutrients"].map(lambda s, k=key: _nutrient(s, k)) / df["servings"]
+
+    # curated diet flags (heuristic: labels + nutrition thresholds)
+    df["is_vegetarian"] = health.map(lambda s: "Vegetarian" in s or "Vegan" in s)
+    df["is_vegan"] = health.map(lambda s: "Vegan" in s)
+    df["is_gluten_free"] = health.map(lambda s: "Gluten-Free" in s)
+    df["is_dairy_free"] = health.map(lambda s: "Dairy-Free" in s)
+    # Keto: very low carbs per serving and fat-dominant (heuristic, not a label).
+    df["is_keto"] = (df["carbs_g"] <= 10) & (df["fat_g"] >= df["protein_g"]) & (df["fat_g"] >= 12)
+    df["diet_tags"] = [
+        ", ".join(lbl for lbl, col in CURATED_DIETS.items() if row[col])
+        for _, row in df[list(CURATED_DIETS.values())].iterrows()
+    ]
 
     before = len(df)
-    # keep rows with a usable target + at least some ingredients/steps
-    df = df[(df["total_time_min"] > 0) & (df["total_time_min"] <= 600)]
-    df = df[(df["num_ingredients"] > 0) & (df["num_steps"] > 0)]
-    df = df.drop_duplicates(subset=["recipe_title"]).reset_index(drop=True)
+    df = df[(df["servings"] >= 1) & (df["num_ingredients"] >= 1)]
+    df = df[(df["calories"] > 5) & (df["calories"] <= 2000)]
+    df = df[(df["protein_g"].between(0, 300)) & (df["carbs_g"].between(0, 500))
+            & (df["fat_g"].between(0, 400))]
+    df = df.dropna(subset=TARGETS)
+    df = df.drop_duplicates(subset=["recipe_name"]).reset_index(drop=True)
+
+    num_cols = TARGETS + ["fiber_g", "sugar_g", "sodium_mg", "servings"]
+    df[num_cols] = df[num_cols].round(1)
     _log(f"cleaned: {len(df)} rows (dropped {before - len(df)})")
     df.to_csv(CLEAN_CSV, index=False)
     _log(f"wrote {CLEAN_CSV.name}")
@@ -134,73 +215,76 @@ def run_eda(df: pd.DataFrame) -> dict:
     imgs = []
 
     fig, ax = plt.subplots(figsize=(6, 3.2))
-    sns.histplot(df["total_time_min"].clip(upper=180), bins=30, ax=ax, color="#b4501f")
-    ax.set_title("Total time (minutes) distribution"); ax.set_xlabel("minutes")
-    imgs.append(("Total cooking time", _fig_to_b64(fig)))
+    sns.histplot(df["calories"].clip(upper=1200), bins=30, ax=ax, color="#9e0027")
+    ax.set_title("Calories per serving"); ax.set_xlabel("kcal")
+    imgs.append(("Calories per serving", _fig_to_b64(fig)))
+
+    fig, axes = plt.subplots(1, 3, figsize=(9, 2.8))
+    for ax, col, color in zip(axes, ["protein_g", "carbs_g", "fat_g"],
+                              ["#51611f", "#a8481c", "#7a4a8a"]):
+        sns.histplot(df[col].clip(upper=df[col].quantile(0.98)), bins=24, ax=ax, color=color)
+        ax.set_title(col.replace("_g", " (g)")); ax.set_xlabel("")
+    fig.tight_layout()
+    imgs.append(("Macronutrient distributions (per serving)", _fig_to_b64(fig)))
 
     fig, ax = plt.subplots(figsize=(6, 3.2))
-    sns.histplot(df["rating"], bins=30, ax=ax, color="#51611f")
-    ax.set_title("Rating distribution (near-constant ~4.9)"); ax.set_xlabel("rating")
-    imgs.append(("Ratings are nearly identical", _fig_to_b64(fig)))
-
-    fig, ax = plt.subplots(figsize=(6, 3.2))
-    sc = df.sample(min(2000, len(df)), random_state=SEED)
-    sns.scatterplot(data=sc, x="num_ingredients", y="total_time_min", ax=ax,
-                    alpha=0.3, color="#a8481c")
-    ax.set_ylim(0, 200); ax.set_title("More ingredients -> more time")
-    imgs.append(("Ingredients vs. time", _fig_to_b64(fig)))
+    sc = df.sample(min(3000, len(df)), random_state=SEED)
+    sns.scatterplot(data=sc, x="fat_g", y="calories", ax=ax, alpha=0.25, color="#9e0027")
+    ax.set_xlim(0, sc["fat_g"].quantile(0.98)); ax.set_ylim(0, 1200)
+    ax.set_title("Fat drives calories"); ax.set_xlabel("fat (g)"); ax.set_ylabel("kcal")
+    imgs.append(("Fat vs. calories", _fig_to_b64(fig)))
 
     fig, ax = plt.subplots(figsize=(6, 3.4))
-    top_course = df["course"].value_counts().head(8)
-    sns.barplot(x=top_course.values, y=top_course.index, ax=ax, color="#94806f")
-    ax.set_title("Recipes by course"); ax.set_xlabel("count")
-    imgs.append(("Courses", _fig_to_b64(fig)))
+    by_course = df.groupby("course")["calories"].median().sort_values(ascending=False)
+    sns.barplot(x=by_course.values, y=by_course.index, ax=ax, color="#94806f")
+    ax.set_title("Median calories by course"); ax.set_xlabel("kcal/serving")
+    imgs.append(("Calories by course", _fig_to_b64(fig)))
 
-    fig, ax = plt.subplots(figsize=(6, 3.4))
-    top_diet = df["diet"].value_counts().head(8)
-    sns.barplot(x=top_diet.values, y=top_diet.index, ax=ax, color="#4d5a1e")
-    ax.set_title("Recipes by diet"); ax.set_xlabel("count")
-    imgs.append(("Diets", _fig_to_b64(fig)))
+    fig, ax = plt.subplots(figsize=(4.6, 3.6))
+    corr = df[["calories", "protein_g", "carbs_g", "fat_g", "fiber_g",
+               "sugar_g", "sodium_mg"]].corr()
+    sns.heatmap(corr, annot=True, fmt=".2f", cmap="rocket_r", ax=ax,
+                annot_kws={"size": 7}, cbar=False)
+    ax.set_title("Nutrient correlations")
+    imgs.append(("Nutrient correlations", _fig_to_b64(fig)))
 
-    corr = (df[["total_time_min", "time_cue_count", "num_steps", "instr_len",
-                "num_ingredients", "ingr_len", "desc_len", "vote_count", "rating"]]
-            .corr()["total_time_min"].round(3).to_dict())
-
+    diet_counts = {lbl: int(df[col].sum()) for lbl, col in CURATED_DIETS.items()}
     stats = {
         "rows": int(len(df)),
-        "median_total_time": float(df["total_time_min"].median()),
-        "mean_total_time": round(float(df["total_time_min"].mean()), 1),
-        "rating_mean": round(float(df["rating"].mean()), 3),
-        "rating_std": round(float(df["rating"].std()), 3),
-        "top_cuisine": df["cuisine"].value_counts().idxmax(),
+        "median_calories": float(df["calories"].median()),
+        "mean_calories": round(float(df["calories"].mean()), 1),
+        "median_protein": float(df["protein_g"].median()),
+        "median_carbs": float(df["carbs_g"].median()),
+        "median_fat": float(df["fat_g"].median()),
         "top_course": df["course"].value_counts().idxmax(),
-        "veg_share": round(float((df["diet"].str.contains("Vegetarian", case=False)).mean()), 2),
-        "corr_time": corr,
+        "veg_share": round(float(df["is_vegetarian"].mean()), 2),
+        "diet_counts": diet_counts,
+        "corr_calories": df[["protein_g", "carbs_g", "fat_g", "fiber_g",
+                             "sugar_g", "sodium_mg"]].corrwith(df["calories"]).round(3).to_dict(),
     }
 
     cards = "".join(
         f'<div class="card"><h3>{title}</h3>'
         f'<img src="data:image/png;base64,{b64}"/></div>'
         for title, b64 in imgs)
+    diet_rows = "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in diet_counts.items())
     html = f"""<!doctype html><html><head><meta charset="utf-8">
 <title>Su Chef — EDA Report</title>
 <style>
- body{{font-family:system-ui,Arial,sans-serif;background:#faf6f2;color:#20140d;margin:0;padding:24px}}
- h1{{color:#b4501f}} .grid{{display:flex;flex-wrap:wrap;gap:18px}}
- .card{{background:#fff;border:1px solid #e0d5cb;border-radius:12px;padding:14px;
-   box-shadow:0 2px 10px rgba(0,0,0,.06)}} .card img{{width:420px;max-width:100%}}
- table{{border-collapse:collapse;margin-top:8px}} td,th{{border:1px solid #e0d5cb;padding:6px 10px}}
+ body{{font-family:system-ui,Arial,sans-serif;background:#faf9f7;color:#1a1c1b;margin:0;padding:24px}}
+ h1{{color:#9e0027}} .grid{{display:flex;flex-wrap:wrap;gap:18px}}
+ .card{{background:#fff;border:1px solid #e6e1da;border-radius:12px;padding:14px;
+   box-shadow:0 2px 10px rgba(0,0,0,.06)}} .card img{{max-width:100%}}
+ table{{border-collapse:collapse;margin-top:8px}} td,th{{border:1px solid #e6e1da;padding:6px 10px}}
 </style></head><body>
 <h1>Su Chef — Exploratory Data Analysis</h1>
-<p>{stats['rows']} cleaned recipes. Median total time
- <b>{stats['median_total_time']:.0f} min</b>. Ratings cluster tightly around
- <b>{stats['rating_mean']}</b> (std {stats['rating_std']}), so we predict
- <b>total time</b>, not rating.</p>
+<p>{stats['rows']} cleaned recipes with real per-serving nutrition. Median
+ <b>{stats['median_calories']:.0f} kcal</b>, {stats['median_protein']:.0f} g protein,
+ {stats['median_carbs']:.0f} g carbs, {stats['median_fat']:.0f} g fat per serving.
+ We model these four nutrition targets from a recipe's ingredients and structure.</p>
 <div class="grid">{cards}</div>
-<h2>Correlation with total time</h2>
-<table><tr><th>feature</th><th>corr</th></tr>
-{''.join(f'<tr><td>{k}</td><td>{v}</td></tr>' for k,v in stats['corr_time'].items())}
-</table>
+<h2>Recipes per diet tag</h2>
+<table><tr><th>diet</th><th>recipes</th></tr>{diet_rows}</table>
 </body></html>"""
     EDA_HTML.write_text(html, encoding="utf-8")
     _log(f"wrote {EDA_HTML.name} ({len(imgs)} charts)")
@@ -213,28 +297,31 @@ def write_contract(df: pd.DataFrame) -> dict:
     """Write artifacts/dataset_contract.json — the rules Crew 2 must obey."""
     contract = {
         "schema": {
-            "recipe_title": "string", "cuisine": "string", "course": "string",
-            "diet": "string", "rating": "float", "vote_count": "int",
-            "prep_time_min": "float", "cook_time_min": "float",
-            "total_time_min": "float", "num_ingredients": "int",
-            "num_steps": "int", "desc_len": "int", "instr_len": "int",
-            "ingr_len": "int", "time_cue_count": "int",
+            "recipe_name": "string", "url": "string", "image_url": "string",
+            "servings": "float", "num_ingredients": "int",
+            "ingredient_text": "string", "ingredient_lines": "string",
+            "course": "string", "cuisine": "string", "diet_tags": "string",
+            "calories": "float", "protein_g": "float", "carbs_g": "float",
+            "fat_g": "float", "fiber_g": "float", "sugar_g": "float",
+            "sodium_mg": "float",
         },
-        "target": TARGET,
+        "target": TARGETS,
         "allowed_values": {
-            "course": sorted(df["course"].value_counts().head(20).index.tolist()),
-            "diet": sorted(df["diet"].value_counts().head(20).index.tolist()),
+            "diet": list(CURATED_DIETS.keys()),
+            "course": sorted(df["course"].value_counts().index.tolist()),
         },
         "constraints": {
-            "total_time_min": {"min": 1, "max": 600},
-            "rating": {"min": 0, "max": 5},
+            "calories": {"min": 5, "max": 2000},
+            "servings": {"min": 1},
             "num_ingredients": {"min": 1},
-            "num_steps": {"min": 1},
         },
         "assumptions": {
-            "time_parsing": "prep_time/cook_time like '15 M' parsed to integer minutes",
-            "counts": "num_ingredients/num_steps = count of '|'-separated entries",
-            "missing_categoricals": "cuisine/course/diet missing -> 'Unknown'",
+            "per_serving": "nutrition columns = recipe total / servings",
+            "nutrients": "protein/carbs/fat/fiber/sugar from Edamam total_nutrients "
+                         "(PROCNT/CHOCDF/FAT/FIBTG/SUGAR); sodium NA in mg",
+            "diet_tags": "heuristic from Edamam health labels (Vegetarian/Vegan/"
+                         "Gluten-Free/Dairy-Free) + Keto (carbs <=10 g, fat-dominant "
+                         "per serving)",
         },
         "row_count": int(len(df)),
     }
@@ -246,15 +333,15 @@ def write_contract(df: pd.DataFrame) -> dict:
 def validate_clean_against_contract(df: pd.DataFrame, contract: dict) -> list[str]:
     """Return a list of problems; empty list == valid. The Flow stops if non-empty."""
     problems = []
-    for col, typ in contract["schema"].items():
+    for col in contract["schema"]:
         if col not in df.columns:
             problems.append(f"missing column: {col}")
-    if TARGET in df.columns:
-        c = contract["constraints"]["total_time_min"]
-        bad = df[(df[TARGET] < c["min"]) | (df[TARGET] > c["max"])]
+    c = contract["constraints"]["calories"]
+    if "calories" in df.columns:
+        bad = df[(df["calories"] < c["min"]) | (df["calories"] > c["max"])]
         if len(bad):
-            problems.append(f"{len(bad)} rows violate total_time_min range {c}")
-    for col in ("num_ingredients", "num_steps"):
+            problems.append(f"{len(bad)} rows violate calories range {c}")
+    for col in ("num_ingredients", "servings"):
         if col in df.columns and (df[col] < 1).any():
             problems.append(f"{col} has values < 1")
     return problems
@@ -264,22 +351,21 @@ def validate_clean_against_contract(df: pd.DataFrame, contract: dict) -> list[st
 
 def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     """Build the modelling table -> artifacts/features.csv. Buckets rare cuisines
-    and derives the binary target is_quick (total time <= QUICK_THRESHOLD)."""
+    and keeps the ingredient text + structure features and the 4 nutrition targets."""
     feats = df.copy()
     top = feats["cuisine"].value_counts().head(TOP_CUISINES).index
     feats["cuisine"] = feats["cuisine"].where(feats["cuisine"].isin(top), "Other")
-    feats[MODEL_TARGET] = (feats[TARGET] <= QUICK_THRESHOLD).astype(int)
-    cols = NUM_FEATURES + CAT_FEATURES + [TARGET, MODEL_TARGET]
-    feats = feats[cols].dropna(subset=[TARGET]).reset_index(drop=True)
+    cols = [TEXT_FEATURE] + NUM_FEATURES + CAT_FEATURES + TARGETS
+    feats = feats[cols].dropna(subset=TARGETS).reset_index(drop=True)
+    feats = feats[feats[TEXT_FEATURE].str.strip().astype(bool)]
     feats.to_csv(FEATURES_CSV, index=False)
-    _log(f"wrote {FEATURES_CSV.name} ({feats.shape[1]} cols, "
-         f"{feats[MODEL_TARGET].mean():.0%} quick)")
+    _log(f"wrote {FEATURES_CSV.name} ({feats.shape[0]} rows, {feats.shape[1]} cols)")
     return feats
 
 
 def validate_features(feats: pd.DataFrame) -> list[str]:
     problems = []
-    for col in NUM_FEATURES + CAT_FEATURES + [MODEL_TARGET]:
+    for col in [TEXT_FEATURE] + NUM_FEATURES + CAT_FEATURES + TARGETS:
         if col not in feats.columns:
             problems.append(f"features.csv missing required column: {col}")
     return problems
@@ -287,182 +373,290 @@ def validate_features(feats: pd.DataFrame) -> list[str]:
 
 # --- Crew 2: train + evaluate ------------------------------------------------
 
-def train_and_evaluate(feats: pd.DataFrame) -> dict:
-    """Train >=2 classifiers to predict whether a recipe is quick (<=45 min),
-    compare them, save the best as artifacts/model.pkl, and write
-    evaluation_report.md. Reproducible (SEED)."""
-    import joblib
+def _build_pre():
     from sklearn.compose import ColumnTransformer
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
-    from sklearn.model_selection import train_test_split
-    from sklearn.pipeline import Pipeline
-    from sklearn.preprocessing import OneHotEncoder
-
-    X = feats[NUM_FEATURES + CAT_FEATURES]
-    y = feats[MODEL_TARGET]
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=SEED, stratify=y)
-    baseline = round(float(max(y.mean(), 1 - y.mean())), 4)  # majority-class accuracy
-
-    pre = ColumnTransformer([
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.preprocessing import OneHotEncoder, StandardScaler
+    return ColumnTransformer([
+        ("txt", TfidfVectorizer(max_features=600, min_df=5, stop_words="english"),
+         TEXT_FEATURE),
         ("cat", OneHotEncoder(handle_unknown="ignore"), CAT_FEATURES),
-        ("num", "passthrough", NUM_FEATURES),
+        ("num", StandardScaler(with_mean=False), NUM_FEATURES),
     ])
+
+
+def train_and_evaluate(feats: pd.DataFrame) -> dict:
+    """Train >=2 multi-output regressors to estimate per-serving nutrition,
+    compare them against a mean baseline, save the best as artifacts/model.pkl,
+    and write evaluation_report.md. Reproducible (SEED)."""
+    import joblib
+    from sklearn.dummy import DummyRegressor
+    from sklearn.ensemble import HistGradientBoostingRegressor
+    from sklearn.linear_model import Ridge
+    from sklearn.metrics import mean_absolute_error, r2_score
+    from sklearn.multioutput import MultiOutputRegressor
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import FunctionTransformer
+    from sklearn.model_selection import train_test_split
+
+    X = feats[[TEXT_FEATURE] + NUM_FEATURES + CAT_FEATURES]
+    y = feats[TARGETS].to_numpy()
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=SEED)
+
+    def scores(pred) -> dict:
+        per = {t: {"r2": round(float(r2_score(y_test[:, i], pred[:, i])), 3),
+                   "mae": round(float(mean_absolute_error(y_test[:, i], pred[:, i])), 1)}
+               for i, t in enumerate(TARGETS)}
+        per["mean_r2"] = round(float(np.mean([per[t]["r2"] for t in TARGETS])), 3)
+        return per
+
+    dummy = DummyRegressor(strategy="mean").fit(X_train, y_train)
+    baseline = scores(dummy.predict(X_test))
+
     candidates = {
-        "LogisticRegression": LogisticRegression(max_iter=1000, random_state=SEED),
-        "RandomForestClassifier": RandomForestClassifier(
-            n_estimators=300, random_state=SEED, n_jobs=-1),
+        "Ridge": Pipeline([("pre", _build_pre()), ("model", Ridge(alpha=1.0))]),
+        "HistGradientBoosting": Pipeline([
+            ("pre", _build_pre()),
+            ("dense", FunctionTransformer(_sk.to_dense, accept_sparse=True)),
+            ("model", MultiOutputRegressor(HistGradientBoostingRegressor(
+                max_iter=300, learning_rate=0.08, random_state=SEED))),
+        ]),
     }
     results, fitted = {}, {}
-    for name, model in candidates.items():
-        pipe = Pipeline([("pre", pre), ("model", model)])
+    for name, pipe in candidates.items():
         pipe.fit(X_train, y_train)
-        pred = pipe.predict(X_test)
-        proba = pipe.predict_proba(X_test)[:, 1]
-        results[name] = {
-            "accuracy": round(float(accuracy_score(y_test, pred)), 4),
-            "f1": round(float(f1_score(y_test, pred)), 4),
-            "roc_auc": round(float(roc_auc_score(y_test, proba)), 4),
-        }
+        results[name] = scores(pipe.predict(X_test))
         fitted[name] = pipe
-        _log(f"{name}: {results[name]}")
+        _log(f"{name}: mean_r2={results[name]['mean_r2']}")
 
-    best = max(results, key=lambda n: results[n]["roc_auc"])
-    joblib.dump({"pipeline": fitted[best], "features": NUM_FEATURES + CAT_FEATURES,
-                 "target": MODEL_TARGET, "quick_threshold": QUICK_THRESHOLD,
+    best = max(results, key=lambda n: results[n]["mean_r2"])
+    defaults = {
+        "num_ingredients": float(feats["num_ingredients"].median()),
+        "servings": float(feats["servings"].median()),
+        "course": feats["course"].mode().iat[0],
+        "cuisine": feats["cuisine"].mode().iat[0],
+    }
+    joblib.dump({"pipeline": fitted[best], "targets": TARGETS,
+                 "text_feature": TEXT_FEATURE, "num_features": NUM_FEATURES,
+                 "cat_features": CAT_FEATURES, "defaults": defaults,
                  "model_name": best}, MODEL_PKL)
     _log(f"wrote {MODEL_PKL.name} (best: {best})")
 
-    rows = "\n".join(
-        f"| {n} | {r['accuracy']} | {r['f1']} | {r['roc_auc']} |"
-        for n, r in results.items())
+    def row(name, s):
+        return (f"| {name} | {s['mean_r2']} | "
+                + " | ".join(f"{s[t]['r2']} / {s[t]['mae']}" for t in TARGETS) + " |")
+
+    header = "| Model | Mean R² | " + " | ".join(f"{t} R²/MAE" for t in TARGETS) + " |"
+    sep = "|" + "---|" * (len(TARGETS) + 2)
+    rows = "\n".join(row(n, results[n]) for n in results)
     EVAL_MD.write_text(
-        f"""# Evaluation Report — "Quick Recipe?" Classifier
+        f"""# Evaluation Report — Nutrition Estimator
 
-Task: predict whether a recipe is **quick** (total time <= {QUICK_THRESHOLD} min)
-from its features. Train/test split 80/20 (stratified), seed {SEED}.
-Majority-class baseline accuracy: **{baseline}**.
+Task: estimate a recipe's **per-serving nutrition** (calories, protein, carbs,
+fat) from its ingredient text + structure. Multi-output regression, train/test
+split 80/20, seed {SEED}. Metric: R² (higher better) and MAE (lower better) per
+target, plus the mean R² across the four targets.
 
-| Model | Accuracy | F1 | ROC-AUC |
-|-------|----------|----|---------|
+Mean-prediction baseline mean R² (by definition ~0.0): **{baseline['mean_r2']}**.
+
+{header}
+{sep}
+{row('Baseline (mean)', baseline)}
 {rows}
 
-**Winner: {best}** (highest ROC-AUC), saved as `model.pkl`.
+**Winner: {best}** (highest mean R²), saved as `model.pkl`.
 
-Interpretation: accuracy/F1 measure correct quick-vs-involved calls; ROC-AUC
-measures how well the model ranks recipes by likelihood of being quick. Both
-models beat the {baseline} majority baseline, so the features
-(step/ingredient counts, instruction length, time-cue words, course, diet,
-cuisine) carry real signal about how long a recipe takes.
+Interpretation: R² above the {baseline['mean_r2']} baseline means the ingredient
+text and structure carry real signal about a recipe's nutrition. Calories and fat
+are the easiest to predict; protein and carbs are harder because they depend on
+exact quantities the model does not see.
 """, encoding="utf-8")
     _log(f"wrote {EVAL_MD.name}")
-    return {"results": results, "best": best, "baseline": baseline}
+    return {"results": results, "baseline": baseline, "best": best}
 
 
 def write_insights(stats: dict) -> None:
-    """Deterministic business summary -> artifacts/insights.md (the CrewAI
-    Analyst crew can enrich this; this guarantees the file always exists)."""
-    corr = stats["corr_time"]
+    """Deterministic business summary -> artifacts/insights.md."""
+    corr = stats["corr_calories"]
+    diet = stats["diet_counts"]
     INSIGHTS_MD.write_text(
         f"""# Recipe Dataset — Business Insights
 
-**Dataset:** {stats['rows']} cleaned recipes (Kaggle "food_recipes").
+**Dataset:** {stats['rows']} cleaned recipes with real, computed nutrition
+(Edamam "recipes-with-nutrition").
 
 ## Headline findings
-- **Ratings are almost meaningless as a target.** Mean rating is
-  {stats['rating_mean']} with std {stats['rating_std']} — nearly every recipe
-  scores ~4.9. So we do **not** predict rating; we predict **how long a recipe
-  takes** (a "quick vs involved" classifier), which has real variance.
-- **Typical recipe takes ~{stats['median_total_time']:.0f} minutes** (median);
-  mean {stats['mean_total_time']:.0f} min.
-- **{stats['veg_share']:.0%} of recipes are vegetarian** — the corpus skews
-  Indian home cooking (top cuisine: {stats['top_cuisine']}, top course:
-  {stats['top_course']}).
+- **A typical serving is ~{stats['median_calories']:.0f} kcal** (median; mean
+  {stats['mean_calories']:.0f}), with ~{stats['median_protein']:.0f} g protein,
+  ~{stats['median_carbs']:.0f} g carbs, ~{stats['median_fat']:.0f} g fat.
+- **Fat is the strongest driver of calories** (correlation
+  {corr.get('fat_g')}), ahead of carbs ({corr.get('carbs_g')}) and protein
+  ({corr.get('protein_g')}).
+- **{stats['veg_share']:.0%} of recipes are vegetarian.** Diet coverage:
+  {", ".join(f"{k} {v}" for k, v in diet.items())}.
 
-## What drives cooking time
-Correlation of each feature with total time:
-{chr(10).join(f"- **{k}**: {v}" for k, v in corr.items() if k != 'total_time_min')}
-
-The strongest signals are **instruction length**, **time-cue words**
-(e.g. "marinate", "soak", "overnight", "bake"), and **number of steps** —
-i.e. *how involved the method is*, more than how many ingredients there are.
+## What this enables
+Because every recipe carries real per-serving nutrition, we can (1) let a cook
+search by macro targets and diet, and (2) train a model that estimates nutrition
+from ingredients for brand-new, generated recipes that have no measured values.
 
 ## Business takeaway
-A cook can be told up-front whether a recipe is a quick weeknight option or a
-longer project, predicted from the recipe's structure before they start.
+Macro-aware cooking: a cook states a calorie/protein goal and a diet, and Su Chef
+finds real matches or builds a custom recipe and estimates how close it lands.
 """, encoding="utf-8")
     _log(f"wrote {INSIGHTS_MD.name}")
 
 
 def write_model_card(model_info: dict) -> None:
-    """Deterministic model card with all 5 required sections ->
-    artifacts/model_card.md (the CrewAI crew can enrich this)."""
+    """Deterministic model card with all required sections -> model_card.md."""
     best = model_info["best"]
     r = model_info["results"][best]
-    baseline = model_info["baseline"]
+    base = model_info["baseline"]
+    rows = model_info.get("rows", "n/a")
+    per = "\n".join(
+        f"- **{t}**: R² {r[t]['r2']}, MAE {r[t]['mae']}" for t in TARGETS)
     CARD_MD.write_text(
-        f"""# Model Card — "Quick Recipe?" Classifier
+        f"""# Model Card — Nutrition Estimator
 
 ## Model purpose
-Predicts whether a recipe is **quick** (total time <= {QUICK_THRESHOLD} minutes)
-or **involved**, from its structure (ingredient/step counts, instruction length,
-time-cue words, course, diet, cuisine). Used in Su Chef to tell a cook up-front
-how much of a project a recipe is.
+Estimates a recipe's **per-serving nutrition** (calories, protein, carbs, fat)
+from its ingredient list and structure (ingredient text, number of ingredients,
+servings, course, cuisine). Used in Su Chef as the learned estimator shown in
+About and as a cross-check on generated recipes. Real recipes always display
+their measured nutrition; the model fills the gap only for novel recipes.
 
 ## Training data summary
-~{model_info.get('rows', 'n/a')} cleaned recipes from the Kaggle "food_recipes"
-dataset (Indian-leaning home cooking, {QUICK_THRESHOLD}-min split ≈ 60% quick /
-40% involved). Features: num_ingredients, num_steps, desc_len, vote_count,
-instr_len, ingr_len, time_cue_count, plus cuisine/course/diet (one-hot).
+~{rows} recipes with real, computed nutrition from the Edamam
+"recipes-with-nutrition" dataset (Western/American-leaning). Targets are
+per-serving values (recipe total / servings). Features: ingredient text
+(TF-IDF, 600 terms), num_ingredients, servings, course, cuisine (one-hot).
 
 ## Metrics (held-out 20% test set, seed {SEED})
-- Best model: **{best}**
-- Accuracy: **{r['accuracy']}** (majority-class baseline {baseline})
-- F1: **{r['f1']}**
-- ROC-AUC: **{r['roc_auc']}**
-Both candidate models (LogisticRegression, RandomForestClassifier) were trained
-and compared; see `evaluation_report.md`.
+- Best model: **{best}** (mean R² **{r['mean_r2']}** vs mean-baseline {base['mean_r2']})
+{per}
+Two models (Ridge, HistGradientBoosting) plus a mean baseline were compared; see
+`evaluation_report.md`.
 
 ## Limitations
-- Moderate accuracy (~70%): cooking time is partly idiosyncratic and not fully
-  determined by recipe structure. Treat the output as a hint, not a guarantee.
-- Trained on a mostly-Indian, mostly-vegetarian corpus, so it may generalise
-  poorly to very different cuisines.
-- Times come from the source authors' own estimates, which vary in accuracy.
+- The model reads ingredient **names**, not exact quantities, so it is an
+  approximation. For generated recipes the app prefers a quantity-based estimate
+  and uses this model as a cross-check.
+- The training nutrition values are themselves Edamam estimates, not lab data.
+- The corpus skews Western/American, so it may generalise poorly to other cuisines.
 
 ## Ethical considerations
-- Low stakes: a wrong "quick/involved" guess only mis-sets expectations.
-- The dataset's cuisine skew could under-serve other food cultures; the corpus
-  should be broadened before treating predictions as authoritative.
+- Nutrition figures are estimates and **not medical or dietary advice**; people
+  with medical dietary needs should not rely on them.
 - No personal data is used; predictions are about recipes, not people.
+- Diet tags are heuristic and may mislabel edge cases; treat them as a guide.
 """, encoding="utf-8")
     _log(f"wrote {CARD_MD.name}")
 
 
 # --- Inference helpers (used by the live app; no heavy/crewai imports) -------
 
+from functools import lru_cache
+
+
+@lru_cache(maxsize=1)
 def load_predictor():
     """Load the trained model bundle from artifacts/model.pkl."""
     import joblib
     return joblib.load(MODEL_PKL)
 
 
-def feature_defaults() -> dict:
-    """Median values for the numeric features, to fill anything the user form
-    doesn't ask for, so a prediction can be made from a few simple inputs."""
-    feats = pd.read_csv(FEATURES_CSV)
-    return {c: float(feats[c].median()) for c in NUM_FEATURES}
+@lru_cache(maxsize=1)
+def _clean_df() -> pd.DataFrame:
+    return pd.read_csv(CLEAN_CSV)
 
 
-def predict_quick(user_inputs: dict) -> float:
-    """Return P(recipe is quick, <= QUICK_THRESHOLD min) for the given inputs
-    (numeric features default to dataset medians; categoricals must be given)."""
-    bundle = load_predictor()
-    row = {**feature_defaults(), **user_inputs}
-    X = pd.DataFrame([{c: row.get(c) for c in bundle["features"]}])
-    return float(bundle["pipeline"].predict_proba(X)[0, 1])
+def estimate_nutrition(fields: dict) -> dict:
+    """Estimate per-serving {calories, protein_g, carbs_g, fat_g} for a recipe
+    from simple inputs. `fields` may include: ingredients (str or list),
+    num_ingredients, servings, course, cuisine. Missing values use dataset
+    defaults."""
+    b = load_predictor()
+    ing = fields.get("ingredients", "")
+    if isinstance(ing, list):
+        ing = " ".join(str(x) for x in ing)
+    d = b["defaults"]
+    row = {
+        TEXT_FEATURE: str(ing or ""),
+        "num_ingredients": fields.get("num_ingredients") or d["num_ingredients"],
+        "servings": fields.get("servings") or d["servings"],
+        "course": fields.get("course") or d["course"],
+        "cuisine": fields.get("cuisine") or d["cuisine"],
+    }
+    pred = b["pipeline"].predict(pd.DataFrame([row]))[0]
+    return {t: round(float(max(0.0, v)), 1) for t, v in zip(b["targets"], pred)}
+
+
+def search_recipes(targets: dict | None = None, diets: list[str] | None = None,
+                   course: str | None = None, query: str | None = None,
+                   k: int = 12) -> list[dict]:
+    """Find real recipes matching macro targets + diets + course + optional text.
+    Returns up to k dicts with measured per-serving nutrition."""
+    df = _clean_df()
+    mask = pd.Series(True, index=df.index)
+    for diet in (diets or []):
+        col = CURATED_DIETS.get(diet)
+        if col and col in df.columns:
+            mask &= df[col].astype(bool)
+    if course and course != "Any":
+        mask &= df["course"] == course
+    targets = targets or {}
+    cal = targets.get("calories")
+    if cal:
+        mask &= df["calories"].between(cal * 0.6, cal * 1.4)
+    prot = targets.get("protein_g")
+    if prot:
+        mask &= df["protein_g"] >= prot * 0.7
+    sub = df[mask]
+    if sub.empty:
+        return []
+
+    if query and query.strip():
+        try:
+            import rag
+            bm25, full = rag._index()
+            qscore = pd.Series(bm25.get_scores(rag._tok(query)), index=full.index)
+            sub = sub.assign(_q=qscore.reindex(sub.index).fillna(0))
+            sub = sub[sub["_q"] > 0].sort_values("_q", ascending=False)
+        except Exception:
+            pass
+    if "_q" not in sub.columns:
+        if cal:
+            sub = sub.assign(_d=(sub["calories"] - cal).abs()).sort_values("_d")
+        else:
+            sub = sub.sample(min(len(sub), 200), random_state=SEED)
+
+    def _s(v):  # NaN-safe string (missing values are float nan, not "")
+        return "" if v is None or (isinstance(v, float) and pd.isna(v)) else str(v)
+
+    def _f(v):  # NaN-safe number -> JSON-valid float
+        try:
+            v = float(v)
+            return 0.0 if pd.isna(v) else round(v, 1)
+        except (TypeError, ValueError):
+            return 0.0
+
+    out = []
+    for _, r in sub.head(k).iterrows():
+        out.append({
+            "title": _s(r.get("recipe_name")),
+            "url": _s(r.get("url")),
+            "image_url": _s(r.get("image_url")),
+            "course": _s(r.get("course")),
+            "cuisine": _s(r.get("cuisine")),
+            "diet_tags": _s(r.get("diet_tags")),
+            "servings": _f(r.get("servings")),
+            "ingredients": _as_list(r.get("ingredient_lines", "[]")),
+            "nutrition": {t: _f(r.get(t)) for t in
+                          TARGETS + ["fiber_g", "sugar_g", "sodium_mg"]},
+            "measured": True,
+        })
+    return out
 
 
 def run_all() -> dict:

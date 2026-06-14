@@ -99,51 +99,64 @@ def api_transcribe():
     return jsonify({"text": stt.transcribe(f.read())})
 
 
-@app.post("/api/predict")
-def api_predict():
-    """P(quick) for the Insights form. Body: numeric + categorical inputs."""
+@app.post("/api/estimate")
+def api_estimate():
+    """Trained-model per-serving nutrition estimate for the About try-it form.
+    Body: {ingredients, servings?, course?, cuisine?, num_ingredients?}."""
     from pipeline import tools as T
     data = request.get_json(force=True, silent=True) or {}
     try:
-        p = T.predict_quick({
-            "num_ingredients": int(data.get("num_ingredients", 8)),
-            "num_steps": int(data.get("num_steps", 6)),
-            "cuisine": data.get("cuisine", "Other"),
-            "course": data.get("course", "Lunch"),
-            "diet": data.get("diet", "Unknown"),
-        })
-        return jsonify({"quick_prob": p})
+        return jsonify({"nutrition": T.estimate_nutrition(data)})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
 
-@app.get("/insights")
-def insights_page():
-    """The data-science view: EDA report + live prediction + model card."""
-    import json
-    art = ROOT / "artifacts"
-    contract = json.loads((art / "dataset_contract.json").read_text(encoding="utf-8"))
-    return render_template(
-        "insights.html",
-        eda=(art / "eda_report.html").read_text(encoding="utf-8"),
-        model_card=(art / "model_card.md").read_text(encoding="utf-8"),
-        evaluation=(art / "evaluation_report.md").read_text(encoding="utf-8"),
-        courses=contract["allowed_values"]["course"],
-        diets=contract["allowed_values"]["diet"],
+@app.post("/api/search")
+def api_search():
+    """Recipe Lab: real recipes matching targets/diets/course/query (measured
+    nutrition). Body: {targets:{calories,protein_g}, diets:[], course, query}."""
+    from pipeline import tools as T
+    data = request.get_json(force=True, silent=True) or {}
+    try:
+        hits = T.search_recipes(
+            targets=data.get("targets") or {},
+            diets=data.get("diets") or [],
+            course=data.get("course"),
+            query=data.get("query"),
+            k=int(data.get("k", 12)),
+        )
+        return jsonify({"results": hits})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.post("/api/build")
+def api_build():
+    """Recipe Lab: generate a custom recipe to targets/diets/course/query, with
+    Claude's quantity-based nutrition + a model cross-check + fit. Body:
+    {targets, diets, course, query, units}."""
+    data = request.get_json(force=True, silent=True) or {}
+    reply = companion.build_macro_recipe(
+        targets=data.get("targets") or {},
+        diets=data.get("diets") or [],
+        course=data.get("course"),
+        query=data.get("query"),
+        units=data.get("units", "metric"),
     )
+    return jsonify(reply)
 
 
 @app.get("/api/insights")
 def api_insights():
-    """Data for the Insights view: model card text + the predict form's options."""
-    import json
+    """Data for the About data-science section: model card + evaluation + the
+    curated diet/course options used by the live estimator form."""
+    from pipeline import tools as T
     art = ROOT / "artifacts"
-    contract = json.loads((art / "dataset_contract.json").read_text(encoding="utf-8"))
     return jsonify({
         "model_card": (art / "model_card.md").read_text(encoding="utf-8"),
         "evaluation": (art / "evaluation_report.md").read_text(encoding="utf-8"),
-        "courses": contract["allowed_values"]["course"],
-        "diets": contract["allowed_values"]["diet"],
+        "diets": list(T.CURATED_DIETS.keys()),
+        "courses": T.COURSES,
     })
 
 

@@ -1,33 +1,23 @@
 # Recipe Dataset — Business Insights
 
-**Dataset:** 7938 cleaned recipes (Kaggle "food_recipes").
+**Dataset:** 38054 cleaned recipes with real, computed nutrition
+(Edamam "recipes-with-nutrition").
 
 ## Headline findings
-- **Ratings are almost meaningless as a target.** Mean rating is
-  4.889 with std 0.077 — nearly every recipe
-  scores ~4.9. So we do **not** predict rating; we predict **how long a recipe
-  takes** (a "quick vs involved" classifier), which has real variance.
-- **Typical recipe takes ~40 minutes** (median);
-  mean 57 min.
-- **81% of recipes are vegetarian** — the corpus skews
-  Indian home cooking (top cuisine: Indian, top course:
-  Lunch).
+- **A typical serving is ~269 kcal** (median; mean
+  355), with ~8 g protein,
+  ~25 g carbs, ~12 g fat.
+- **Fat is the strongest driver of calories** (correlation
+  0.848), ahead of carbs (0.627) and protein
+  (0.665).
+- **62% of recipes are vegetarian.** Diet coverage:
+  Vegetarian 23625, Vegan 9602, Gluten-Free 21519, Dairy-Free 18651, Keto 3109.
 
-## What drives cooking time
-Correlation of each feature with total time:
-- **time_cue_count**: 0.184
-- **num_steps**: 0.159
-- **instr_len**: 0.201
-- **num_ingredients**: 0.057
-- **ingr_len**: 0.066
-- **desc_len**: 0.051
-- **vote_count**: 0.029
-- **rating**: -0.031
-
-The strongest signals are **instruction length**, **time-cue words**
-(e.g. "marinate", "soak", "overnight", "bake"), and **number of steps** —
-i.e. *how involved the method is*, more than how many ingredients there are.
+## What this enables
+Because every recipe carries real per-serving nutrition, we can (1) let a cook
+search by macro targets and diet, and (2) train a model that estimates nutrition
+from ingredients for brand-new, generated recipes that have no measured values.
 
 ## Business takeaway
-A cook can be told up-front whether a recipe is a quick weeknight option or a
-longer project, predicted from the recipe's structure before they start.
+Macro-aware cooking: a cook states a calorie/protein goal and a diet, and Su Chef
+finds real matches or builds a custom recipe and estimates how close it lands.

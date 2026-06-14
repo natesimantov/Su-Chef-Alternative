@@ -6,3 +6,5 @@ crewai>=0.40
 chromadb>=0.5
 matplotlib>=3.7
 seaborn>=0.13
+huggingface_hub>=0.23   # download the recipes-with-nutrition dataset
+pyarrow>=15             # parquet support for dataset I/O

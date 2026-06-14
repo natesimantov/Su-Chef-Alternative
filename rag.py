@@ -15,7 +15,7 @@ from pathlib import Path
 import pandas as pd
 
 _CLEAN = Path(__file__).resolve().parent / "artifacts" / "clean_data.csv"
-_FIELDS = ["recipe_title", "ingredients", "cuisine", "course", "diet"]
+_FIELDS = ["recipe_name", "ingredient_text", "cuisine", "course", "diet_tags"]
 
 
 _STOP = {"how", "do", "i", "to", "the", "a", "an", "with", "and", "or", "of",
@@ -59,11 +59,11 @@ def search(query: str, k: int = 3) -> list[dict]:
                 continue
             r = df.iloc[int(i)]
             out.append({
-                "title": str(r.get("recipe_title", "")),
+                "title": str(r.get("recipe_name", "")),
                 "cuisine": str(r.get("cuisine", "")),
-                "diet": str(r.get("diet", "")),
-                "total_time_min": float(r.get("total_time_min", 0) or 0),
-                "ingredients": str(r.get("ingredients", "")),
+                "diet": str(r.get("diet_tags", "")),
+                "calories": float(r.get("calories", 0) or 0),
+                "ingredients": str(r.get("ingredient_text", "")),
                 "url": str(r.get("url", "")),
             })
         return out
@@ -78,9 +78,8 @@ def grounding_block(query: str, k: int = 3) -> str:
         return ""
     lines = []
     for h in hits:
-        ings = h["ingredients"].replace("|", ", ")[:240]
+        ings = h["ingredients"][:240]
+        tags = ", ".join(t for t in (h["cuisine"], h["diet"]) if t)
         lines.append(
-            f"- {h['title']} ({h['cuisine']}, {h['diet']}, "
-            f"~{h['total_time_min']:.0f} min): {ings}"
-            + (f" [source: {h['url']}]" if h['url'] else ""))
+            f"- {h['title']} ({tags}, ~{h['calories']:.0f} kcal/serving): {ings}")
     return "Relevant real recipes from our database:\n" + "\n".join(lines)

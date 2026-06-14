@@ -60,18 +60,19 @@ def write_dataset_contract() -> str:
 
 @tool("engineer_features")
 def engineer_features() -> str:
-    """Read cleaned data, build the modelling table with the binary target
-    is_quick, and write artifacts/features.csv. Returns a summary."""
+    """Read cleaned data, build the modelling table (ingredient text + structure
+    features and the per-serving nutrition targets), and write
+    artifacts/features.csv. Returns a summary."""
     df = pd.read_csv(T.CLEAN_CSV)
     feats = T.engineer_features(df)
-    return f"Wrote features.csv {feats.shape}, {feats[T.MODEL_TARGET].mean():.0%} quick"
+    return f"Wrote features.csv {feats.shape} (targets: {', '.join(T.TARGETS)})"
 
 
 @tool("train_and_compare_models")
 def train_and_compare_models() -> str:
-    """Train and compare two classifiers on features.csv, save the best to
-    artifacts/model.pkl, write evaluation_report.md, and write the model card.
-    Returns the metrics as JSON."""
+    """Train and compare two multi-output regressors on features.csv, save the
+    best to artifacts/model.pkl, write evaluation_report.md, and write the model
+    card. Returns the metrics as JSON."""
     feats = pd.read_csv(T.FEATURES_CSV)
     info = T.train_and_evaluate(feats)
     info["rows"] = int(len(feats))

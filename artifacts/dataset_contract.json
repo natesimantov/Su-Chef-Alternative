@@ -1,73 +1,66 @@
 {
   "schema": {
-    "recipe_title": "string",
-    "cuisine": "string",
-    "course": "string",
-    "diet": "string",
-    "rating": "float",
-    "vote_count": "int",
-    "prep_time_min": "float",
-    "cook_time_min": "float",
-    "total_time_min": "float",
+    "recipe_name": "string",
+    "url": "string",
+    "image_url": "string",
+    "servings": "float",
     "num_ingredients": "int",
-    "num_steps": "int",
-    "desc_len": "int",
-    "instr_len": "int",
-    "ingr_len": "int",
-    "time_cue_count": "int"
+    "ingredient_text": "string",
+    "ingredient_lines": "string",
+    "course": "string",
+    "cuisine": "string",
+    "diet_tags": "string",
+    "calories": "float",
+    "protein_g": "float",
+    "carbs_g": "float",
+    "fat_g": "float",
+    "fiber_g": "float",
+    "sugar_g": "float",
+    "sodium_mg": "float"
   },
-  "target": "total_time_min",
+  "target": [
+    "calories",
+    "protein_g",
+    "carbs_g",
+    "fat_g"
+  ],
   "allowed_values": {
+    "diet": [
+      "Vegetarian",
+      "Vegan",
+      "Gluten-Free",
+      "Dairy-Free",
+      "Keto"
+    ],
     "course": [
       "Appetizer",
-      "Brunch",
+      "Bread",
+      "Breakfast",
       "Dessert",
-      "Dinner",
-      "Indian Breakfast",
-      "Lunch",
-      "Main Course",
-      "North Indian Breakfast",
-      "One Pot Dish",
-      "Side Dish",
+      "Drink",
+      "Main",
+      "Salad",
+      "Side",
       "Snack",
-      "South Indian Breakfast",
-      "Unknown",
-      "World Breakfast"
-    ],
-    "diet": [
-      "Diabetic Friendly",
-      "Eggetarian",
-      "Gluten Free",
-      "High Protein Non Vegetarian",
-      "High Protein Vegetarian",
-      "No Onion No Garlic (Sattvic)",
-      "Non Vegeterian",
-      "Sugar Free Diet",
-      "Unknown",
-      "Vegan",
-      "Vegetarian"
+      "Soup"
     ]
   },
   "constraints": {
-    "total_time_min": {
-      "min": 1,
-      "max": 600
+    "calories": {
+      "min": 5,
+      "max": 2000
     },
-    "rating": {
-      "min": 0,
-      "max": 5
-    },
-    "num_ingredients": {
+    "servings": {
       "min": 1
     },
-    "num_steps": {
+    "num_ingredients": {
       "min": 1
     }
   },
   "assumptions": {
-    "time_parsing": "prep_time/cook_time like '15 M' parsed to integer minutes",
-    "counts": "num_ingredients/num_steps = count of '|'-separated entries",
-    "missing_categoricals": "cuisine/course/diet missing -> 'Unknown'"
+    "per_serving": "nutrition columns = recipe total / servings",
+    "nutrients": "protein/carbs/fat/fiber/sugar from Edamam total_nutrients (PROCNT/CHOCDF/FAT/FIBTG/SUGAR); sodium NA in mg",
+    "diet_tags": "heuristic from Edamam health labels (Vegetarian/Vegan/Gluten-Free/Dairy-Free) + Keto (carbs <=10 g, fat-dominant per serving)"
   },
-  "row_count": 7938
+  "row_count": 38054
 }

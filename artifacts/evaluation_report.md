@@ -1,18 +1,21 @@
-# Evaluation Report — "Quick Recipe?" Classifier
+# Evaluation Report — Nutrition Estimator
 
-Task: predict whether a recipe is **quick** (total time <= 45 min)
-from its features. Train/test split 80/20 (stratified), seed 42.
-Majority-class baseline accuracy: **0.5989**.
+Task: estimate a recipe's **per-serving nutrition** (calories, protein, carbs,
+fat) from its ingredient text + structure. Multi-output regression, train/test
+split 80/20, seed 42. Metric: R² (higher better) and MAE (lower better) per
+target, plus the mean R² across the four targets.
 
-| Model | Accuracy | F1 | ROC-AUC |
-|-------|----------|----|---------|
-| LogisticRegression | 0.6952 | 0.7627 | 0.7549 |
-| RandomForestClassifier | 0.6902 | 0.7533 | 0.7513 |
+Mean-prediction baseline mean R² (by definition ~0.0): **0.0**.
 
-**Winner: LogisticRegression** (highest ROC-AUC), saved as `model.pkl`.
+| Model | Mean R² | calories R²/MAE | protein_g R²/MAE | carbs_g R²/MAE | fat_g R²/MAE |
+|---|---|---|---|---|---|
+| Baseline (mean) | 0.0 | -0.0 / 202.0 | -0.0 / 12.2 | -0.0 / 22.8 | -0.0 / 13.7 |
+| Ridge | 0.349 | 0.3 / 159.6 | 0.493 / 7.7 | 0.289 / 17.6 | 0.316 / 10.3 |
+| HistGradientBoosting | 0.521 | 0.52 / 129.8 | 0.607 / 6.3 | 0.485 / 15.0 | 0.473 / 8.8 |
 
-Interpretation: accuracy/F1 measure correct quick-vs-involved calls; ROC-AUC
-measures how well the model ranks recipes by likelihood of being quick. Both
-models beat the 0.5989 majority baseline, so the features
-(step/ingredient counts, instruction length, time-cue words, course, diet,
-cuisine) carry real signal about how long a recipe takes.
+**Winner: HistGradientBoosting** (highest mean R²), saved as `model.pkl`.
+
+Interpretation: R² above the 0.0 baseline means the ingredient
+text and structure carry real signal about a recipe's nutrition. Calories and fat
+are the easiest to predict; protein and carbs are harder because they depend on
+exact quantities the model does not see.

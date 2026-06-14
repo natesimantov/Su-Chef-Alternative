@@ -196,3 +196,113 @@ iframe.eda { width:100%; height:560px; border:1px solid var(--hairline); border-
 .asksend { margin-top:8px; width:100%; height:40px; border:none; border-radius:9999px; background:var(--primary);
   color:var(--on-primary); font-weight:700; cursor:pointer; text-transform:uppercase; letter-spacing:0.05em; }
 .hidden { display:none !important; }
+
+/* ---------- Sidebar: hamburger + brand + New + Recent sessions ---------- */
+.sidebar { position:relative; }
+.sidebar-head { display:flex; align-items:center; gap:8px; padding:0 4px 22px; }
+.sidebar-head .brand { padding:0; }
+.brand[data-view] { cursor:pointer; }
+.menubtn { display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px;
+  border-radius:10px; border:1px solid var(--outline); background:var(--card); color:var(--ink); cursor:pointer; }
+.menubtn:hover { border-color:var(--accent); color:var(--accent); }
+.navmenu { display:none; position:absolute; top:54px; left:14px; right:14px; z-index:50;
+  flex-direction:column; gap:2px; padding:8px; background:var(--card); border:1px solid var(--outline);
+  border-radius:14px; box-shadow:var(--shadow-2); }
+.navmenu.open { display:flex; }
+.navmenu a { display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:9px;
+  color:var(--ink); text-decoration:none; font-weight:500; cursor:pointer; }
+.navmenu a:hover { background:var(--surface-3); }
+.navmenu a.active { background:var(--primary); color:var(--on-primary); }
+.navmenu a.active .material-symbols-outlined { color:var(--on-primary); }
+.newbtn { display:flex; align-items:center; gap:10px; width:100%; margin:0 0 16px; padding:11px 14px;
+  border:1px solid var(--outline); border-radius:12px; background:var(--card); color:var(--ink);
+  font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:14px; cursor:pointer; }
+.newbtn:hover { border-color:var(--accent); color:var(--accent); }
+.sessions { flex:1 1 auto; min-height:0; overflow-y:auto; }
+.sec-label { font-family:'Hanken Grotesk',sans-serif; text-transform:uppercase; letter-spacing:0.1em;
+  font-weight:700; font-size:11px; color:var(--faint); padding:0 6px 8px; }
+.sessions-list { display:flex; flex-direction:column; gap:2px; }
+.session { display:flex; align-items:center; gap:6px; padding:9px 12px; border-radius:9px; cursor:pointer;
+  color:var(--sidebar-ink); font-size:14px; }
+.session:hover { background:var(--surface-3); }
+.session.active { background:var(--surface-3); font-weight:600; box-shadow:inset 3px 0 0 var(--accent); }
+.session .stitle { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.session .sdel { opacity:0; border:none; background:transparent; color:var(--faint); cursor:pointer;
+  display:inline-flex; padding:2px; border-radius:6px; }
+.session .sdel .material-symbols-outlined { font-size:16px; }
+.session:hover .sdel { opacity:1; }
+.session .sdel:hover { color:var(--accent); }
+.sidebar-foot { margin-top:8px; padding-top:10px; border-top:1px solid var(--hairline); }
+
+/* hero CTA -> Recipe Lab */
+.herocta { display:inline-flex; align-items:center; gap:8px; padding:11px 18px; border-radius:9999px;
+  border:1px solid var(--outline); background:var(--card); color:var(--ink); cursor:pointer;
+  font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:14px; margin-bottom:8px; }
+.herocta:hover { border-color:var(--accent); color:var(--accent); }
+
+/* ---------- Recipe card additions ---------- */
+.recipe-head { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; }
+.recipe-head h3 { margin:0; }
+.recipe .cols.single { grid-template-columns:1fr; }
+.recipe .pill.diet { background:transparent; border:1px solid var(--accent); color:var(--accent); }
+.addrec { flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 14px;
+  border:1px solid var(--outline); border-radius:9999px; background:var(--card); color:var(--ink);
+  font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:12px; cursor:pointer; white-space:nowrap; }
+.addrec:hover { border-color:var(--accent); color:var(--accent); }
+.addrec.on { background:var(--primary); color:var(--on-primary); border-color:var(--primary); }
+.addrec .material-symbols-outlined { font-size:18px; }
+.crosscheck { margin-top:10px; font-size:13px; color:var(--muted); font-style:italic; }
+
+/* ---------- Recipe Lab ---------- */
+.lab-form .grid-targets { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+@media (max-width:760px){ .lab-form .grid-targets { grid-template-columns:1fr 1fr; } }
+.chipset { display:flex; flex-wrap:wrap; gap:8px; }
+.dchip { padding:8px 14px; border:1px solid var(--outline); border-radius:9999px; background:var(--card);
+  color:var(--chip-ink); font-family:'Hanken Grotesk',sans-serif; font-weight:600; font-size:13px; cursor:pointer; }
+.dchip:hover { border-color:var(--accent); }
+.dchip.on { background:var(--primary); color:var(--on-primary); border-color:var(--primary); }
+.lab-actions { display:flex; gap:12px; margin-top:6px; flex-wrap:wrap; }
+.send.ghost { background:var(--card); color:var(--ink); border:1px solid var(--outline); }
+.send.ghost:hover { border-color:var(--accent); color:var(--accent); filter:none; }
+.send .material-symbols-outlined { font-size:18px; margin-right:6px; }
+.lab-status { color:var(--muted); font-size:15px; margin:6px 2px 14px; }
+.lab-results { display:flex; flex-direction:column; gap:18px; }
+.fit { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px 16px; border-radius:14px;
+  background:var(--surface-3); }
+.fit.ok { background:color-mix(in srgb, var(--primary) 12%, var(--card)); border:1px solid var(--primary); }
+.fit-head { font-family:'Hanken Grotesk',sans-serif; font-weight:700; text-transform:uppercase;
+  letter-spacing:0.05em; font-size:13px; color:var(--accent); }
+.fit-m { font-size:13px; color:var(--muted); background:var(--card); border:1px solid var(--hairline);
+  border-radius:9999px; padding:5px 11px; }
+.fit-m.ok { color:var(--ink); border-color:var(--accent); }
+
+.lab-hint { font-size:13px; color:var(--muted); margin:12px 2px 0; max-width:640px; }
+.est-card { margin-top:6px; }
+
+/* ---------- About (Apple-style + accordion) ---------- */
+.about-lede { font-family:'EB Garamond',serif; font-size:26px; line-height:1.4; max-width:720px; margin:0 0 16px; }
+.about-body { color:var(--muted); max-width:720px; margin:0 0 22px; }
+.acc-group { display:flex; flex-direction:column; gap:10px; max-width:900px; }
+.acc { background:var(--card); border:1px solid var(--hairline); border-radius:14px; box-shadow:var(--shadow); overflow:hidden; }
+.acc summary { cursor:pointer; list-style:none; display:flex; align-items:center; gap:10px; padding:16px 20px;
+  font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:15px; color:var(--ink); }
+.acc summary::-webkit-details-marker { display:none; }
+.acc summary .material-symbols-outlined { color:var(--accent); }
+.acc summary::after { content:'expand_more'; font-family:'Material Symbols Outlined'; margin-left:auto;
+  color:var(--muted); transition:transform .2s; }
+.acc[open] summary::after { transform:rotate(180deg); }
+.acc .acc-body { padding:0 20px 20px; }
+.acc .acc-body p { color:var(--muted); margin:0; max-width:720px; }
+.acc .acc-body .eda { margin-top:4px; }
+.field textarea { width:100%; padding:10px 12px; border:1px solid var(--outline); border-radius:10px;
+  background:var(--surface); color:var(--ink); font:inherit; resize:vertical; }
+#est-result { margin-top:14px; }
+
+/* ---------- Modal (saved recipe viewer) ---------- */
+.modal { position:fixed; inset:0; background:rgba(20,18,17,.55); display:flex; align-items:flex-start;
+  justify-content:center; padding:5vh 16px; z-index:300; overflow:auto; }
+.modal-inner { position:relative; width:100%; max-width:840px; }
+.modal-close { position:absolute; top:-6px; right:-6px; width:42px; height:42px; border-radius:9999px;
+  border:none; background:var(--card); color:var(--ink); cursor:pointer; box-shadow:var(--shadow-2);
+  display:inline-flex; align-items:center; justify-content:center; z-index:2; }
+.modal-close:hover { color:var(--accent); }
