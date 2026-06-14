@@ -152,8 +152,20 @@
           </div>
 
           <h2 class="about-h2">Meet the agents</h2>
-          <p class="about-body">Two small AI crews built the data and model behind the app, each a team of focused agents working in sequence.</p>
-          <div class="crew-label">Crew 1 · Recipe Analyst</div>
+          <p class="about-body">A <b>kitchen crew</b> reviews every recipe you get, and a <b>data crew</b> (a CrewAI pipeline) built the nutrition model behind the app. Each is a team of focused agents.</p>
+          <div class="crew-label">Kitchen crew · reviews every recipe</div>
+          <div class="agents-grid">
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#9e0027">restaurant_menu</span>
+              <b>Head Chef</b><p>Composes the recipe and pulls the crew's notes together.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#c8862b">nutrition</span>
+              <b>Nutritionist</b><p>Reads the macros and how the dish fits your goals.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#2a6f7f">health_and_safety</span>
+              <b>Dietitian &amp; Safety</b><p>Flags diet fit, common allergens, and food-safety tips.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#6a4a8a">blender</span>
+              <b>Equipment &amp; Subs</b><p>Lists the tools you need and handy ingredient swaps.</p></div>
+          </div>
+          <div class="crew-label">Data crew · built the model (CrewAI pipeline)</div>
+          <div class="crew-label crew-sub">Crew 1 · Recipe Analyst</div>
           <div class="agents-grid">
             <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#9e0027">database</span>
               <b>Data Loader</b><p>Loads and cleans the raw recipe data into a tidy table.</p></div>
@@ -162,7 +174,7 @@
             <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#2f6f57">description</span>
               <b>Contract Author</b><p>Writes the schema and rules the modelling crew must follow.</p></div>
           </div>
-          <div class="crew-label">Crew 2 · Recipe Scientist</div>
+          <div class="crew-label crew-sub">Crew 2 · Recipe Scientist</div>
           <div class="agents-grid">
             <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#2a6f7f">verified</span>
               <b>Data Validator</b><p>Checks the cleaned data obeys the contract before modelling.</p></div>

@@ -224,6 +224,10 @@ function renderRecipe(r) {
   if (r.total_time_min) meta.appendChild(el('span', 'pill', `${r.total_time_min} min`));
   if (r.course) meta.appendChild(el('span', 'pill', r.course));
   if (r.diet_tags) r.diet_tags.split(',').map(s => s.trim()).filter(Boolean).forEach(t => meta.appendChild(el('span', 'pill diet', t)));
+  if (r.nutrition && r.nutrition.calories) meta.appendChild(el('span', 'pill', `${Math.round(r.nutrition.calories)} kcal`));
+  const _er = r.expert_review || {}, _ds = _er.diet_safety || {};
+  (_ds.diet_flags || []).forEach(f => meta.appendChild(el('span', 'pill ok', f + ' ✓')));
+  (_ds.allergens || []).forEach(a => meta.appendChild(el('span', 'pill warn', '⚠ ' + a)));
   if (meta.children.length) card.appendChild(meta);
   const cols = el('div', 'cols');
   const left = el('div', '');
@@ -240,8 +244,41 @@ function renderRecipe(r) {
     cols.appendChild(right);
   } else { cols.classList.add('single'); }
   card.appendChild(cols);
+  if (r.expert_review) card.appendChild(renderExpertReview(r.expert_review));
   attachAskAbout(card);
   return card;
+}
+function renderExpertReview(er) {
+  const d = document.createElement('details'); d.className = 'expert-review';
+  const sum = document.createElement('summary');
+  sum.innerHTML = '<span class="material-symbols-outlined">groups</span>Expert review';
+  d.appendChild(sum);
+  const body = el('div', 'er-body');
+  const rows = [];
+  if (er.nutrition_note) rows.push(['#9e0027', 'Nutritionist', cv(er.nutrition_note)]);
+  const ds = er.diet_safety || {};
+  const dsText = [
+    (ds.diet_flags && ds.diet_flags.length) ? 'Suitable for ' + ds.diet_flags.join(', ') : '',
+    (ds.allergens && ds.allergens.length) ? 'Allergens: ' + ds.allergens.join(', ') : 'No common allergens flagged',
+    ds.safety_note || '',
+  ].filter(Boolean).join(' · ');
+  if (dsText) rows.push(['#2a6f7f', 'Dietitian & Safety', cv(dsText)]);
+  const eq = er.equipment || {};
+  const eqText = [
+    (eq.tools && eq.tools.length) ? 'Tools: ' + eq.tools.join(', ') : '',
+    (eq.substitutions && eq.substitutions.length) ? 'Swaps: ' + eq.substitutions.join(', ') : '',
+    eq.note || '',
+  ].filter(Boolean).join(' · ');
+  if (eqText) rows.push(['#b4501f', 'Equipment & Subs', cv(eqText)]);
+  rows.forEach(([color, name, text]) => {
+    const row = el('div', 'expert-row');
+    const dot = el('span', 'expert-dot'); dot.style.background = color; row.appendChild(dot);
+    const txt = el('div', 'expert-txt');
+    txt.appendChild(el('b', '', name)); txt.appendChild(el('span', '', ' ' + text));
+    row.appendChild(txt); body.appendChild(row);
+  });
+  d.appendChild(body);
+  return d;
 }
 function renderNutrition(n, measured) {
   const wrap = el('div', 'nutri');

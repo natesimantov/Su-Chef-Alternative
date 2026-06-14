@@ -81,6 +81,32 @@ _RECIPE_SCHEMA = {
             },
             "additionalProperties": False,
         },
+        # The "kitchen crew" — short expert reviews shown on the recipe card.
+        "expert_review": {
+            "type": "object",
+            "properties": {
+                "nutrition_note": {"type": "string"},
+                "diet_safety": {
+                    "type": "object",
+                    "properties": {
+                        "diet_flags": {"type": "array", "items": {"type": "string"}},
+                        "allergens": {"type": "array", "items": {"type": "string"}},
+                        "safety_note": {"type": "string"},
+                    },
+                    "additionalProperties": False,
+                },
+                "equipment": {
+                    "type": "object",
+                    "properties": {
+                        "tools": {"type": "array", "items": {"type": "string"}},
+                        "substitutions": {"type": "array", "items": {"type": "string"}},
+                        "note": {"type": "string"},
+                    },
+                    "additionalProperties": False,
+                },
+            },
+            "additionalProperties": False,
+        },
     },
     "required": ["context", "title", "intro", "servings", "total_time_min",
                  "ingredients", "utensils", "steps", "follow_ups"],
@@ -227,6 +253,19 @@ def _build_recipe(messages: list[dict], key: str, units: str, grounding: str,
                "estimates, not exact. The context line must be DRY and factual "
                "(e.g. \"Recipe for paneer butter masala for 4.\") — no exclamation "
                "points, no praise, no enthusiasm, no em dashes.")
+    system += ("\n\nYou are also Su Chef's KITCHEN CREW reviewing this recipe. Fill "
+               "expert_review with SHORT, accurate notes (one line each, no fluff): "
+               "nutrition_note = the Nutritionist's qualitative read of the macros "
+               "(e.g. \"Lean and high in protein, light on carbs\"). "
+               "diet_safety.diet_flags = diets this recipe actually satisfies "
+               "(e.g. Vegetarian, Gluten-Free, Vegan, Dairy-Free, Keto). "
+               "diet_safety.allergens = common allergens genuinely present, from "
+               "{peanuts, tree nuts, dairy, eggs, gluten, soy, shellfish, fish}; "
+               "empty if none. diet_safety.safety_note = one practical food-safety "
+               "line (e.g. \"Cook chicken to 75C / 165F\"). equipment.tools = key "
+               "equipment needed. equipment.substitutions = handy swaps as \"X -> Y\". "
+               "equipment.note = one line. Be honest about allergens and diet "
+               "compliance; never claim a diet it does not meet.")
     if extra_directive:
         system += "\n\n" + extra_directive
     resp = client.messages.create(
@@ -246,6 +285,7 @@ def _build_recipe(messages: list[dict], key: str, units: str, grounding: str,
         "tip": data.get("tip", "").strip(),
         "source_url": data.get("source_url", "").strip(),
         "nutrition": data.get("nutrition") or None,
+        "expert_review": data.get("expert_review") or None,
     }
     recipe["nutrition_model"] = _model_nutrition(recipe)
     fu = [s for s in data.get("follow_ups", []) if isinstance(s, str)][:3]
