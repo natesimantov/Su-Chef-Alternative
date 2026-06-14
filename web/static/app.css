@@ -218,6 +218,31 @@ iframe.eda { width:100%; height:560px; border:1px solid var(--hairline); border-
   border:1px solid var(--outline); border-radius:12px; background:var(--card); color:var(--ink);
   font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:14px; cursor:pointer; }
 .newbtn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Recipe Lab — dedicated, attention-grabbing CTA (a core feature, not a tucked-away one) */
+.lab-cta { position:relative; display:flex; flex-direction:column; gap:3px; width:100%; margin:0 0 18px;
+  padding:13px 15px; border:none; border-radius:14px; cursor:pointer; text-align:left; overflow:hidden;
+  color:var(--on-primary); background:linear-gradient(135deg, var(--primary), var(--accent));
+  box-shadow:0 8px 22px rgba(158,0,39,.30); }
+.lab-cta:hover { filter:brightness(1.06); transform:translateY(-1px); }
+.lab-cta .lab-cta-top { display:flex; align-items:center; gap:8px;
+  font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:15px; }
+.lab-cta .lab-cta-top .material-symbols-outlined { font-variation-settings:'FILL' 1; }
+.lab-cta .lab-cta-sub { font-size:12px; opacity:.88; }
+.lab-cta .newbadge { margin-left:auto; background:var(--on-primary); color:var(--primary);
+  font-family:'Hanken Grotesk',sans-serif; font-size:10px; font-weight:800; letter-spacing:.08em;
+  padding:2px 8px; border-radius:9999px; }
+.lab-cta::after { content:''; position:absolute; top:0; left:-60%; width:38%; height:100%;
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,.45), transparent);
+  transform:skewX(-20deg); animation:labshine 3.4s ease-in-out infinite; }
+@keyframes labshine { 0% { left:-60%; } 55%,100% { left:130%; } }
+@media (prefers-reduced-motion: reduce) { .lab-cta::after { display:none; } .lab-cta:hover { transform:none; } }
+
+/* mobile nav "new" dot on Recipe Lab */
+.mnav a[data-new] { position:relative; }
+.mnav a[data-new]::after { content:''; position:absolute; top:4px; right:4px; width:8px; height:8px;
+  border-radius:50%; background:var(--accent); box-shadow:0 0 0 2px var(--surface); }
+
 .sessions { flex:1 1 auto; min-height:0; overflow-y:auto; }
 .sec-label { font-family:'Hanken Grotesk',sans-serif; text-transform:uppercase; letter-spacing:0.1em;
   font-weight:700; font-size:11px; color:var(--faint); padding:0 6px 8px; }

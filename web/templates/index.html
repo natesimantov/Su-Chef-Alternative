@@ -15,9 +15,9 @@
     <div class="brand" data-view="chat">Su&nbsp;Chef<span class="dot">.</span></div>
     <nav class="mnav">
       <a data-view="chat" class="active material-symbols-outlined" title="Chat">forum</a>
-      <a data-view="lab" class="material-symbols-outlined" title="Recipe Lab">science</a>
+      <a data-view="lab" class="material-symbols-outlined" title="Recipe Lab — cook to your macros (new!)" data-new="1">science</a>
       <a data-view="saved" class="material-symbols-outlined" title="Saved">bookmark</a>
-      <a data-view="about" class="material-symbols-outlined" title="About">info</a>
+      <a data-view="about" class="material-symbols-outlined" title="About Su Chef">info</a>
       <a data-view="prefs" class="material-symbols-outlined" title="Preferences">settings</a>
     </nav>
   </div>
@@ -29,12 +29,15 @@
         <div class="brand" data-view="chat">Su&nbsp;Chef<span class="dot">.</span></div>
       </div>
       <nav class="navmenu" id="navMenu">
-        <a data-view="lab"><span class="material-symbols-outlined">science</span>Recipe Lab</a>
         <a data-view="saved"><span class="material-symbols-outlined">bookmark</span>Saved</a>
-        <a data-view="about"><span class="material-symbols-outlined">info</span>About</a>
+        <a data-view="about"><span class="material-symbols-outlined">info</span>About Su Chef</a>
         <a data-view="prefs"><span class="material-symbols-outlined">settings</span>Preferences</a>
       </nav>
       <button class="newbtn" id="newSide"><span class="material-symbols-outlined">add</span>New chat</button>
+      <button class="lab-cta" id="labCta" data-view="lab" title="Recipe Lab — set calorie & macro targets, then find real chef recipes or generate a custom one that fits your goals">
+        <span class="lab-cta-top"><span class="material-symbols-outlined">auto_awesome</span>Recipe&nbsp;Lab<span class="newbadge">NEW</span></span>
+        <span class="lab-cta-sub">Cook to your macros →</span>
+      </button>
       <div class="sessions">
         <div class="sec-label">Recent sessions</div>
         <div id="sessions-list" class="sessions-list"></div>
