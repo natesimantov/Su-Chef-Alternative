@@ -49,8 +49,8 @@ if ($('newTop')) $('newTop').onclick = () => { state.messages = []; render(); wi
 function fillVoices() {
   const sel = $('voice'); if (!sel || sel.options.length) return;
   // Synthesis happens server-side (edge-tts), so every accent works in any browser.
-  [['Default voice', 'en'], ['British', 'en-gb'], ['American', 'en-us'],
-   ['Irish', 'en-ie'], ['Australian', 'en-au'], ['Indian', 'en-in']]
+  [['Aria', 'en-us'], ['Sonia', 'en-gb'], ['Emily', 'en-ie'],
+   ['Natasha', 'en-au'], ['Neerja', 'en-in']]
     .forEach(([label, lang]) => sel.appendChild(new Option(label, lang)));
 }
 fillVoices();
