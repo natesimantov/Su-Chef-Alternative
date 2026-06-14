@@ -40,10 +40,31 @@ app = Flask(__name__, template_folder="templates", static_folder="static")
 app.config["TEMPLATES_AUTO_RELOAD"] = True
 app.jinja_env.auto_reload = True
 
+_STATIC = Path(__file__).resolve().parent / "static"
+
+
+def _asset_v() -> str:
+    """A cache-busting version string from the static files' mtimes, so browsers
+    fetch fresh app.js/app.css after every deploy."""
+    try:
+        return str(int(max((_STATIC / f).stat().st_mtime
+                           for f in ("app.js", "app.css"))))
+    except Exception:
+        return "1"
+
+
+@app.after_request
+def _no_store_html(resp):
+    """Never cache the HTML page — it carries the asset version, so it must always
+    be fresh (the static files themselves are cache-busted by ?v=)."""
+    if resp.mimetype == "text/html":
+        resp.headers["Cache-Control"] = "no-store"
+    return resp
+
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", asset_v=_asset_v())
 
 
 @app.post("/api/ask")

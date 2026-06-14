@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Public+Sans:wght@400;500;600;700&family=Hanken+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet" />
-<link href="{{ url_for('static', filename='app.css') }}" rel="stylesheet" />
+<link href="{{ url_for('static', filename='app.css') }}?v={{ asset_v }}" rel="stylesheet" />
 </head>
 <body>
   <!-- Mobile top bar -->
@@ -25,8 +25,8 @@
   <div class="app">
     <aside class="sidebar">
       <div class="sidebar-head">
-        <button class="menubtn" id="menuBtn" title="Menu" aria-label="Menu"><span class="material-symbols-outlined">menu</span></button>
         <div class="brand" data-view="chat">Su&nbsp;Chef<span class="dot">.</span></div>
+        <button class="menubtn" id="menuBtn" title="Menu" aria-label="Menu"><span class="material-symbols-outlined">menu</span></button>
       </div>
       <nav class="navmenu" id="navMenu">
         <a data-view="saved"><span class="material-symbols-outlined">bookmark</span>Saved</a>
@@ -54,9 +54,9 @@
         <!-- Chat / Home -->
         <section id="v-chat" class="view active">
           <div id="empty" class="hero">
-            <div class="eyebrow">Your kitchen companion</div>
-            <h1>What are we cooking?</h1>
-            <p class="sub">Ask anything while you cook — by voice or text — and I'll answer, build recipes, and keep you company.</p>
+            <div class="eyebrow">Personal Kitchen Companion</div>
+            <h1>What's Cooking?</h1>
+            <p class="sub">Ask anything while you cook! I'll answer any kitchen question, suggest tips, fix problems, and keep you company.</p>
             <button class="herocta" data-view="lab"><span class="material-symbols-outlined">science</span>Cook to your macros in Recipe Lab</button>
           </div>
           <div class="composer">
@@ -86,7 +86,7 @@
             </div>
             <div class="lab-actions">
               <button id="lab-find" class="send"><span class="material-symbols-outlined">verified</span>Chef recipes</button>
-              <button id="lab-generate" class="send ghost"><span class="material-symbols-outlined">auto_awesome</span>Generate one</button>
+              <button id="lab-generate" class="send alt"><span class="material-symbols-outlined">auto_awesome</span>Generate New Recipe</button>
             </div>
             <p class="lab-hint">Chef recipes are real, kitchen-tested dishes from our cookbook with measured nutrition. Generate one builds a fresh recipe to your exact targets.</p>
           </div>
@@ -101,7 +101,7 @@
               <label class="field"><span class="label">Servings</span><input id="est-servings" type="number" min="1" value="2"></label>
               <label class="field"><span class="label">Course</span><select id="est-course"></select></label>
             </div>
-            <button id="est-go" class="send"><span class="material-symbols-outlined">nutrition</span>Estimate nutrition</button>
+            <button id="est-go" class="send"><span class="material-symbols-outlined">nutrition</span>Calculate Nutrition</button>
             <div id="est-result"></div>
           </div>
         </section>
@@ -117,15 +117,28 @@
         <!-- About -->
         <section id="v-about" class="view">
           <div class="eyebrow">About</div>
-          <h1 class="serif" style="font-size:48px;margin:0 0 16px;">Su&nbsp;Chef</h1>
-          <p class="about-lede">Su Chef answers your cooking questions and builds recipes around real nutrition goals, by voice or text, while you're still at the stove.</p>
-          <p class="about-body">It pairs a conversational chef with a large food dataset and a trained nutrition model, so any recipe can be searched, generated, and measured against the way you want to eat. Su Chef is an experimental student project; its nutrition figures are estimates, not medical advice.</p>
+          <h1 class="serif" style="font-size:48px;margin:0 0 16px;">About Su&nbsp;Chef</h1>
+          <p class="about-lede">Your personal kitchen companion. Ask any cooking question by voice or text, build recipes around real nutrition goals, and check what's on your plate, all while you're still at the stove.</p>
+          <p class="about-body">Under the hood it pairs a conversational chef with a large food dataset and a trained nutrition model, so any recipe can be searched, generated, and measured against the way you want to eat.</p>
 
+          <h2 class="about-h2">What you can do</h2>
+          <div class="use-cards">
+            <div class="use-card"><span class="material-symbols-outlined">forum</span>
+              <b>Ask &amp; cook</b><p>Fire off any kitchen question and get an instant, spoken answer. “Out of buttermilk?” “Is my chicken done?”</p></div>
+            <div class="use-card"><span class="material-symbols-outlined">science</span>
+              <b>Build in Recipe Lab</b><p>Set calorie and macro targets, pick diets and a course, then find real chef recipes or generate a new one that fits.</p></div>
+            <div class="use-card"><span class="material-symbols-outlined">nutrition</span>
+              <b>Calculate nutrition</b><p>Paste any meal's ingredients and get its estimated per-serving calories, protein, carbs, and fat.</p></div>
+            <div class="use-card"><span class="material-symbols-outlined">bookmark</span>
+              <b>Save &amp; revisit</b><p>Pin answers you love, keep your recipes, and jump back into past sessions anytime.</p></div>
+          </div>
+
+          <h2 class="about-h2">The data &amp; model behind it</h2>
           <div class="acc-group">
             <details class="acc">
               <summary><span class="material-symbols-outlined">model_training</span>How the nutrition model works</summary>
               <div class="acc-body">
-                <p>Su Chef learned from about <b>38,000 real recipes</b> that each carry measured nutrition. From those it trained a model that <b>estimates a recipe's per-serving calories, protein, carbs, and fat</b> from its ingredients. Searched “Chef recipes” show their real, measured numbers; for recipes Su Chef generates, the model double-checks the nutrition. You can try the estimator yourself in <b>Recipe Lab → Estimate a meal</b>.</p>
+                <p>The app learned from about <b>38,000 real recipes</b> that each carry measured nutrition. From those it trained a model that <b>estimates a recipe's per-serving calories, protein, carbs, and fat</b> from its ingredients. Searched “Chef recipes” show their real, measured numbers; for generated recipes, the model double-checks the nutrition. Try it yourself in <b>Recipe Lab → Calculate Nutrition</b>.</p>
               </div>
             </details>
             <details class="acc">
@@ -136,6 +149,33 @@
               <summary><span class="material-symbols-outlined">description</span>Model card &amp; performance</summary>
               <div class="acc-body"><div id="about-modelcard" class="md"></div></div>
             </details>
+          </div>
+
+          <h2 class="about-h2">Meet the agents</h2>
+          <p class="about-body">Two small AI crews built the data and model behind the app, each a team of focused agents working in sequence.</p>
+          <div class="crew-label">Crew 1 · Recipe Analyst</div>
+          <div class="agents-grid">
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#9e0027">database</span>
+              <b>Data Loader</b><p>Loads and cleans the raw recipe data into a tidy table.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#c8862b">insights</span>
+              <b>Exploratory Analyst</b><p>Explores the data and builds the charts and findings.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#2f6f57">description</span>
+              <b>Contract Author</b><p>Writes the schema and rules the modelling crew must follow.</p></div>
+          </div>
+          <div class="crew-label">Crew 2 · Recipe Scientist</div>
+          <div class="agents-grid">
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#2a6f7f">verified</span>
+              <b>Data Validator</b><p>Checks the cleaned data obeys the contract before modelling.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#6a4a8a">tune</span>
+              <b>Feature Engineer</b><p>Turns recipes into the features the model learns from.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#b4501f">model_training</span>
+              <b>Model Trainer</b><p>Trains and compares nutrition models, then writes the model card.</p></div>
+          </div>
+
+          <div class="fineprint">
+            <p><b>A course project.</b> Su Chef is an experimental project built for the AI Development &amp; Collaboration course. It simulates how an AI product team turns raw data into a working, predictive product.</p>
+            <p><b>Ethics &amp; safety.</b> Nutrition figures are model estimates, not medical or dietary advice. AI answers and recipes can be wrong, so use your judgment, especially around allergies and food safety.</p>
+            <p><b>Credits.</b> Recipe data from a public recipes-with-nutrition dataset. Built with Claude, CrewAI, Flask, and scikit-learn. © 2026 Su Chef.</p>
           </div>
         </section>
 
@@ -153,7 +193,7 @@
                 <option value="nocturnal">Nocturnal Hearth (dark)</option>
               </select>
             </div>
-            <div class="field"><span class="label">Voice / accent</span>
+            <div class="field"><span class="label">Voice</span>
               <select id="voice" style="max-width:280px;height:46px;border:1px solid var(--outline);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 12px;"></select>
             </div>
           </div>
@@ -171,6 +211,6 @@
     </div>
   </div>
 
-  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v={{ asset_v }}"></script>
 </body>
 </html>
