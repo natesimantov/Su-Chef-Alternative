@@ -1,8 +1,7 @@
-# Runtime deps for the deployed app (kept lean for Streamlit Cloud).
-streamlit>=1.40
+# Runtime deps for the deployed Flask app (kept lean for Railway).
+# The Streamlit app + voice input (faster-whisper) live in requirements-dev.txt.
+flask>=3.0
 anthropic>=0.40
-streamlit-js-eval>=0.1.7
-faster-whisper>=1.0
 pandas>=2.0
 scikit-learn>=1.3
 joblib>=1.3

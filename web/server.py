@@ -99,7 +99,10 @@ def api_transcribe():
     f = request.files.get("audio")
     if not f:
         return jsonify({"error": "no audio"}), 400
-    import stt
+    try:
+        import stt
+    except Exception:  # faster-whisper not installed (e.g. lean prod deploy)
+        return jsonify({"error": "voice input is not available on this server"}), 503
     return jsonify({"text": stt.transcribe(f.read())})
 
 
@@ -177,4 +180,5 @@ def health():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8600, debug=False, threaded=True)
+    port = int(os.environ.get("PORT", 8600))  # Railway provides $PORT
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
