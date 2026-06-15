@@ -54,18 +54,31 @@ function deleteSession(id) {
   if (id === currentId) { currentId = sessions[0].id; state.messages = currentSession().messages; render(); }
   persist(); renderSessions();
 }
+function sessionTitle(s) { return s.customTitle || s.title || 'New topic'; }
+function renameSession(id, name) {
+  const s = sessions.find(x => x.id === id); if (!s) return;
+  s.customTitle = (name || '').trim(); persist(); renderSessions();
+}
+function startRename(row, titleEl, s) {
+  const inp = document.createElement('input'); inp.className = 'srename'; inp.value = sessionTitle(s);
+  row.replaceChild(inp, titleEl); inp.focus(); inp.select();
+  inp.onclick = (e) => e.stopPropagation();
+  inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } else if (e.key === 'Escape') { inp.dataset.cancel = '1'; renderSessions(); } };
+  inp.onblur = () => { if (inp.dataset.cancel) return; renameSession(s.id, inp.value); };
+}
 function renderSessions() {
   const list = $('sessions-list'); if (!list) return;
   const ordered = [...sessions].sort((a, b) => b.ts - a.ts);
   list.innerHTML = '';
   ordered.forEach(s => {
-    const title = (s.title || 'New chat').slice(0, 44);
     const row = el('div', 'session' + (s.id === currentId ? ' active' : ''));
-    const t = el('span', 'stitle', title); row.appendChild(t);
-    const del = el('button', 'sdel'); del.innerHTML = '<span class="material-symbols-outlined">close</span>';
-    del.title = 'Delete session';
+    const t = el('span', 'stitle', sessionTitle(s).slice(0, 44));
+    row.appendChild(t);
+    const edit = el('button', 'sedit'); edit.innerHTML = '<span class="material-symbols-outlined">edit</span>'; edit.title = 'Rename';
+    edit.onclick = (e) => { e.stopPropagation(); startRename(row, t, s); };
+    const del = el('button', 'sdel'); del.innerHTML = '<span class="material-symbols-outlined">close</span>'; del.title = 'Delete';
     del.onclick = (e) => { e.stopPropagation(); deleteSession(s.id); };
-    row.appendChild(del);
+    row.appendChild(edit); row.appendChild(del);
     row.onclick = () => loadSession(s.id);
     list.appendChild(row);
   });
@@ -127,19 +140,29 @@ function setAudio(on) {
 setAudio(state.audioOn);
 if ($('audioToggle')) $('audioToggle').onclick = () => setAudio(!state.audioOn);
 
-/* voice list — real English accents, male + female (free edge-tts) */
+/* voice list — real English accents (free edge-tts) */
 function fillVoices() {
   const sel = $('voice'); if (!sel || sel.options.length) return;
-  [['Aria · American (F)', 'american-f'], ['Guy · American (M)', 'american-m'],
-   ['Sonia · British (F)', 'british-f'], ['Ryan · British (M)', 'british-m'],
-   ['Emily · Irish (F)', 'irish-f'], ['Connor · Irish (M)', 'irish-m'],
-   ['Natasha · Australian (F)', 'australian-f'], ['William · Australian (M)', 'australian-m'],
-   ['Neerja · Indian (F)', 'indian-f'], ['Prabhat · Indian (M)', 'indian-m']]
+  [['Aria · American', 'american-f'], ['Guy · American', 'american-m'],
+   ['Sonia · British', 'british-f'], ['Ryan · British', 'british-m'],
+   ['Emily · Irish', 'irish-f'], ['Connor · Irish', 'irish-m'],
+   ['Natasha · Australian', 'australian-f'], ['William · Australian', 'australian-m'],
+   ['Neerja · Indian', 'indian-f'], ['Prabhat · Indian', 'indian-m']]
     .forEach(([label, lang]) => sel.appendChild(new Option(label, lang)));
   const saved = localStorage.getItem('voice'); if (saved) sel.value = saved;
   sel.onchange = () => localStorage.setItem('voice', sel.value);
 }
 fillVoices();
+
+/* voice playback speed */
+state.speed = parseFloat(localStorage.getItem('voiceSpeed')) || 1;
+function rateStr() { const pct = Math.round((state.speed - 1) * 100); return (pct >= 0 ? '+' : '-') + Math.abs(pct) + '%'; }
+(function initSpeed() {
+  const sl = $('voiceSpeed'), val = $('speedVal'); if (!sl) return;
+  const fmt = v => parseFloat(v.toFixed(2)) + 'x';
+  sl.value = state.speed; if (val) val.textContent = fmt(state.speed);
+  sl.oninput = () => { state.speed = parseFloat(sl.value); localStorage.setItem('voiceSpeed', state.speed); if (val) val.textContent = fmt(state.speed); };
+})();
 if ($('voiceTest')) $('voiceTest').onclick = () =>
   playTTS("Hi, I'm Su Chef. Let's cook something delicious together.", ($('voice') || {}).value || 'american-f');
 
@@ -147,16 +170,21 @@ function stopSpeak() {
   if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
   try { window.speechSynthesis.cancel(); } catch (e) {}
 }
+let ttsToken = 0;
 async function playTTS(text, lang) {
   stopSpeak();
+  const my = ++ttsToken;  // supersede any in-flight request (debounce rapid clicks)
   const clean = convertTemps(text, state.units);
   try {
-    const res = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, lang }) });
+    const res = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, lang, rate: rateStr() }) });
+    if (my !== ttsToken) return;
     if (!res.ok) throw new Error('tts');
-    const a = new Audio(URL.createObjectURL(await res.blob()));
+    const blob = await res.blob();
+    if (my !== ttsToken) return;
+    const a = new Audio(URL.createObjectURL(blob));
     currentAudio = a;
     a.play().catch(() => fallbackSpeak(clean, lang));
-  } catch (e) { fallbackSpeak(clean, lang); }
+  } catch (e) { if (my === ttsToken) fallbackSpeak(clean, lang); }
 }
 async function speak(text) {
   if (!state.audioOn || !text) return;
@@ -168,6 +196,7 @@ function fallbackSpeak(text, lang) {
     const voices = window.speechSynthesis.getVoices();
     const v = voices.find(x => x.lang.toLowerCase().startsWith(lang)) || voices.find(x => /^en/i.test(x.lang));
     if (v) u.voice = v;
+    u.rate = state.speed || 1;
     window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
   } catch (e) {}
 }
@@ -226,7 +255,8 @@ function render() {
     const row = el('div', 'row');
     let main;
     if (!a.pending && a.recipe) main = renderRecipe(a.recipe);
-    else { main = el('div', a.pending ? 'answer thinking' : 'answer'); main.textContent = a.pending ? 'Su Chef is thinking…' : cv(a.content || ''); }
+    else if (a.pending) { main = el('div', 'answer'); main.appendChild(thinkingEl('Su Chef is thinking...')); }
+    else { main = el('div', 'answer'); main.textContent = cv(a.content || ''); }
     row.appendChild(main);
     if (!a.pending) {
       const tools = el('div', 'answer-tools');
@@ -248,6 +278,13 @@ function render() {
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 function tbtn(icon, fn) { const b = el('button', 'tbtn'); b.innerHTML = `<span class="material-symbols-outlined">${icon}</span>`; b.onclick = () => fn(b); return b; }
 function chip(text, isRecipe) { const b = el('button', 'chip' + (isRecipe ? ' recipe' : '')); b.textContent = (isRecipe ? '🍳 ' : '') + text; b.onclick = () => ask(text); return b; }
+function thinkingEl(label) {
+  const w = el('div', 'thinking');
+  const spec = el('div', 'thinking-spectrum');
+  for (let i = 0; i < 6; i++) { const b = el('span', 'tspec-bar'); b.style.animationDelay = (i * 0.11) + 's'; spec.appendChild(b); }
+  w.appendChild(spec); w.appendChild(el('span', 'tlabel', label || 'Su Chef is thinking...'));
+  return w;
+}
 
 /* ---------- recipe widget (two-column editorial + nutrition) ---------- */
 function renderRecipe(r) {
@@ -427,7 +464,6 @@ async function loadLab() {
     const d = await (await fetch('/api/insights')).json();
     const cs = $('lab-course'); cs.appendChild(new Option('Any', 'Any'));
     (d.courses || []).forEach(c => cs.appendChild(new Option(c, c)));
-    const ec = $('est-course'); if (ec) (d.courses || []).forEach(c => ec.appendChild(new Option(c, c)));
     const chips = $('lab-diets');
     (d.diets || []).forEach(diet => {
       const b = el('button', 'dchip'); b.type = 'button'; b.textContent = diet; b.dataset.diet = diet;
@@ -439,16 +475,20 @@ async function loadLab() {
   $('est-go').onclick = estimateMeal;
 }
 async function estimateMeal() {
-  const ings = $('est-ingredients').value.split('\n').map(s => s.trim()).filter(Boolean);
-  if (!ings.length) { $('est-result').textContent = 'Add a few ingredients first.'; return; }
-  const body = { ingredients: ings, num_ingredients: ings.length, servings: +$('est-servings').value || 2, course: $('est-course').value };
-  $('est-result').textContent = 'Estimating…';
+  const text = $('est-ingredients').value.trim();
+  const out = $('est-result');
+  if (!text) { out.textContent = 'Describe a meal first.'; return; }
+  out.innerHTML = ''; out.appendChild(thinkingEl('Calculating nutrition...'));
   try {
-    const d = await (await fetch('/api/estimate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
-    $('est-result').innerHTML = '';
-    if (d.nutrition) $('est-result').appendChild(renderNutrition(d.nutrition, false));
-    else $('est-result').textContent = d.error || 'Estimate unavailable';
-  } catch (e) { $('est-result').textContent = 'Estimate failed. Try again.'; }
+    const d = await (await fetch('/api/calc-nutrition', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, units: state.units }) })).json();
+    out.innerHTML = '';
+    if (!d.nutrition) { out.textContent = d.error === 'no_key' ? 'Add an API key to calculate.' : 'Could not estimate. Try rephrasing.'; return; }
+    out.appendChild(renderNutrition(d.nutrition, false));
+    const note = [d.basis, d.assumptions].filter(Boolean).join(' · ');
+    if (note) out.appendChild(el('div', 'calc-note', note));
+    if (d.clarify) out.appendChild(el('div', 'calc-clarify', '💬 ' + d.clarify));
+    if (d.nutrition_model) out.appendChild(el('div', 'crosscheck', `Model cross-check: ~${Math.round(d.nutrition_model.calories)} kcal, ${Math.round(d.nutrition_model.protein_g)}g protein, ${Math.round(d.nutrition_model.carbs_g)}g carbs, ${Math.round(d.nutrition_model.fat_g)}g fat`));
+  } catch (e) { out.textContent = 'Estimate failed. Try again.'; }
 }
 function labTargets() {
   const num = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) && v > 0 ? Math.round(v) : undefined; };
@@ -480,7 +520,8 @@ function renderChefResult(h) {
 async function labRun(mode) {
   const status = $('lab-status'), out = $('lab-results');
   const body = { targets: labTargets(), diets: labDiets(), course: $('lab-course').value, query: $('lab-query').value.trim(), units: state.units };
-  out.innerHTML = ''; status.textContent = mode === 'find' ? 'Finding chef recipes…' : 'Cooking up a custom recipe…';
+  out.innerHTML = ''; status.innerHTML = '';
+  status.appendChild(thinkingEl(mode === 'find' ? 'Finding chef recipes...' : 'Cooking up your recipe...'));
   try {
     if (mode === 'find') {
       const d = await (await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
@@ -539,15 +580,46 @@ async function loadAbout() {
 /* ---------- voice input (browser SpeechRecognition, no server needed) ---------- */
 const micBtn = $('mic');
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recog = null, recognizing = false;
+let recog = null, recognizing = false, micStream = null, micCtx = null, micRaf = 0, lastErr = '', micStart = 0;
+function stopMicViz() {
+  cancelAnimationFrame(micRaf);
+  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  if (micCtx) { try { micCtx.close(); } catch (e) {} micCtx = null; }
+  if (micBtn) micBtn.style.removeProperty('--vol');
+}
+async function startMicViz() {  // explicit permission + reactive level (real "listening" feedback)
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    micCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const an = micCtx.createAnalyser(); an.fftSize = 256;
+    micCtx.createMediaStreamSource(micStream).connect(an);
+    const buf = new Uint8Array(an.fftSize);
+    const tick = () => {
+      an.getByteTimeDomainData(buf);
+      let s = 0; for (let i = 0; i < buf.length; i++) { const d = buf[i] - 128; s += d * d; }
+      micBtn.style.setProperty('--vol', Math.min(1, Math.sqrt(s / buf.length) / 30).toFixed(2));
+      micRaf = requestAnimationFrame(tick);
+    };
+    tick(); return true;
+  } catch (e) { return false; }
+}
+function endVoice() {
+  recognizing = false; if (micBtn) micBtn.classList.remove('listening'); stopMicViz();
+  const said = (qInput.value || '').trim();
+  if (!said && lastErr && (Date.now() - micStart < 1500)) {
+    qInput.placeholder = 'Voice input is blocked in this browser (e.g. Brave). Use Edge or Chrome.';
+  } else if (said) { ask(said); }
+  else updatePlaceholder();
+}
 if (micBtn && !SpeechRec) {
   micBtn.onclick = () => { qInput.placeholder = 'Voice input needs Chrome or Edge. Type instead.'; };
 } else if (micBtn) {
   let finalText = '';
-  const startRecog = () => {
+  const startRecog = async () => {
+    lastErr = ''; finalText = ''; micStart = Date.now();
+    if (!(await startMicViz())) { qInput.placeholder = 'Mic blocked. Allow microphone access, then tap again.'; return; }
     recog = new SpeechRec();
     recog.lang = 'en-US'; recog.interimResults = true; recog.continuous = true; recog.maxAlternatives = 1;
-    finalText = '';
     recog.onstart = () => { recognizing = true; micBtn.classList.add('listening'); qInput.placeholder = 'Listening, speak now...'; };
     recog.onresult = (e) => {
       let interim = '';
@@ -556,22 +628,11 @@ if (micBtn && !SpeechRec) {
         if (e.results[i].isFinal) finalText += t; else interim += t;
       }
       qInput.value = (finalText + interim).trim();
-      if (finalText.trim()) { try { recog.stop(); } catch (e) {} }  // got a full phrase -> finish + ask
+      if (finalText.trim()) { try { recog.stop(); } catch (e) {} }  // full phrase -> finish + ask
     };
-    recog.onerror = (e) => {
-      const msg = { 'no-speech': "Didn't catch that. Tap the mic and speak.",
-        'audio-capture': 'No microphone found.',
-        'not-allowed': 'Mic blocked. Allow access in your browser.',
-        'service-not-allowed': 'Mic blocked. Allow access in your browser.',
-        'network': 'Network issue with speech. Try again.' }[e.error] || 'Voice error. Try again.';
-      qInput.placeholder = msg;
-    };
-    recog.onend = () => {
-      recognizing = false; micBtn.classList.remove('listening');
-      const said = (finalText || qInput.value || '').trim();
-      if (said) ask(said); else updatePlaceholder();
-    };
-    try { recog.start(); } catch (e) { recognizing = false; micBtn.classList.remove('listening'); }
+    recog.onerror = (e) => { lastErr = e.error || 'error'; };
+    recog.onend = endVoice;
+    try { recog.start(); } catch (e) { stopMicViz(); micBtn.classList.remove('listening'); recognizing = false; }
   };
   micBtn.onclick = () => {
     if (recognizing) { try { recog.stop(); } catch (e) {} return; }

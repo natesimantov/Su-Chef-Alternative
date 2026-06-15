@@ -22,18 +22,12 @@
     <aside class="sidebar">
       <div class="sidebar-head">
         <div class="brand" data-view="chat">Su&nbsp;Chef<span class="dot">.</span></div>
-        <button class="menubtn" id="menuBtn" title="Menu" aria-label="Menu"><span class="material-symbols-outlined">menu</span></button>
       </div>
-      <nav class="navmenu" id="navMenu">
-        <a data-view="saved"><span class="material-symbols-outlined">bookmark</span>Saved</a>
-        <a data-view="about"><span class="material-symbols-outlined">info</span>About Su Chef</a>
-        <a data-view="prefs"><span class="material-symbols-outlined">settings</span>Preferences</a>
-      </nav>
-      <button class="newbtn" id="newSide"><span class="material-symbols-outlined">add</span>New chat</button>
       <button class="lab-cta" id="labCta" data-view="lab" title="Recipe Lab — set calorie & macro targets, then find real chef recipes or generate a custom one that fits your goals">
         <span class="lab-cta-top"><span class="material-symbols-outlined">science</span>Recipe&nbsp;Lab<span class="newbadge">NEW</span></span>
         <span class="lab-cta-sub">Cook to your macros →</span>
       </button>
+      <button class="newbtn" id="newSide"><span class="material-symbols-outlined">add</span>New topic</button>
       <div class="sessions">
         <div class="sec-label">Recent sessions</div>
         <div id="sessions-list" class="sessions-list"></div>
@@ -42,7 +36,9 @@
 
     <main class="content">
       <div class="topctrls">
-        <button class="ctrlbtn" id="newTop" title="Start a new chat"><span class="material-symbols-outlined">add</span>New</button>
+        <button class="ctrlbtn" data-view="saved" title="Saved"><span class="material-symbols-outlined">bookmark</span>Saved</button>
+        <button class="ctrlbtn" data-view="about" title="About Su Chef"><span class="material-symbols-outlined">info</span>About</button>
+        <button class="ctrlbtn" data-view="prefs" title="Preferences"><span class="material-symbols-outlined">settings</span>Preferences</button>
         <button class="ctrlbtn on" id="audioToggle" title="Read answers aloud"><span class="material-symbols-outlined">volume_up</span>Audio</button>
       </div>
       <div class="wrap">
@@ -65,11 +61,12 @@
         <!-- Recipe Lab -->
         <section id="v-lab" class="view">
           <div class="eyebrow">Two tools, one lab</div>
-          <h1 class="serif lab-title" style="font-size:40px;margin:0 0 18px;">Recipe Lab</h1>
+          <h1 class="serif lab-title" style="font-size:40px;margin:0 0 8px;">Recipe Lab</h1>
+          <p class="sub lab-intro">Two kitchen tools. <b>Recipe Finder &amp; Builder</b> turns calorie and macro goals into real chef recipes or a fresh generated one. <b>Nutrition Calculator</b> estimates the nutrition of any meal you describe.</p>
 
           <section class="lab-tool">
-            <div class="lab-tool-head"><span class="lab-num">1</span>
-              <div><b>Find or build a recipe</b><p>Set targets, pick diets and a course, then find real chef recipes or generate a fresh one.</p></div>
+            <div class="lab-tool-head"><span class="lab-icon material-symbols-outlined">menu_book</span>
+              <div><b>Recipe Finder &amp; Builder</b><p>Set targets, pick diets and a course, then find real chef recipes or generate a fresh one.</p></div>
             </div>
             <div class="card lab-form">
               <div class="grid-targets">
@@ -85,7 +82,7 @@
               </div>
               <div class="lab-actions">
                 <button id="lab-find" class="send"><span class="material-symbols-outlined">verified</span>Chef recipes</button>
-                <button id="lab-generate" class="send alt"><span class="material-symbols-outlined">auto_awesome</span>Generate New Recipe</button>
+                <button id="lab-generate" class="send alt"><span class="material-symbols-outlined">soup_kitchen</span>Generate recipe<span class="newbadge">NEW</span></button>
               </div>
               <p class="lab-hint">Chef recipes are real, kitchen-tested dishes with measured nutrition and a sourced photo. Generate builds a fresh recipe to your exact targets.</p>
             </div>
@@ -93,18 +90,12 @@
             <div id="lab-results" class="lab-results"></div>
           </section>
 
-          <div class="lab-divider"><span>and</span></div>
-
           <section class="lab-tool">
-            <div class="lab-tool-head"><span class="lab-num">2</span>
-              <div><b>Calculate a meal's nutrition</b><p>Already have a dish in mind? Paste its ingredients for a per-serving estimate.</p></div>
+            <div class="lab-tool-head"><span class="lab-icon material-symbols-outlined">nutrition</span>
+              <div><b>Nutrition Calculator</b><p>Describe any meal in your own words and get an estimated calorie and macro breakdown.</p></div>
             </div>
             <div class="card est-card">
-              <label class="field"><span class="label">Ingredients (one per line)</span><textarea id="est-ingredients" rows="4" placeholder="200g chicken breast&#10;2 cups cooked rice&#10;1 tbsp olive oil"></textarea></label>
-              <div class="grid2">
-                <label class="field"><span class="label">Servings</span><input id="est-servings" type="number" min="1" value="2"></label>
-                <label class="field"><span class="label">Course</span><select id="est-course"></select></label>
-              </div>
+              <label class="field"><span class="label">Describe your meal</span><textarea id="est-ingredients" rows="3" placeholder="e.g. 200g grilled beef with rice and a side salad"></textarea></label>
               <button id="est-go" class="send"><span class="material-symbols-outlined">nutrition</span>Calculate Nutrition</button>
               <div id="est-result"></div>
             </div>
@@ -122,8 +113,7 @@
         <!-- About -->
         <section id="v-about" class="view">
           <div class="eyebrow">About Su Chef</div>
-          <h1 class="serif" style="font-size:40px;margin:0 0 16px;">Your private kitchen crew</h1>
-          <p class="about-lede">Fast, friendly help the moment you need it. Ask a burning question mid-cook, talk through a what if, or dream up a brand new dish from a craving. There is always someone in the kitchen with you.</p>
+          <p class="about-lede">Ask a burning question mid-cook, talk through a what if, or dream up a brand new dish from a craving. There is always someone in the kitchen with you.</p>
 
           <h2 class="about-h2">How to use Su Chef</h2>
           <div class="use-cards">
@@ -214,6 +204,9 @@
                 <select id="voice"></select>
                 <button id="voiceTest" class="ctrlbtn" type="button" title="Hear a sample"><span class="material-symbols-outlined">play_arrow</span>Sample</button>
               </div>
+            </div>
+            <div class="field"><span class="label">Voice speed <span id="speedVal" class="speed-val">1.0x</span></span>
+              <input id="voiceSpeed" type="range" min="0.7" max="1.3" step="0.05" value="1" class="speed-slider">
             </div>
           </div>
         </section>

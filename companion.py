@@ -354,6 +354,74 @@ def build_macro_recipe(targets: dict | None = None, diets: list[str] | None = No
     return reply
 
 
+_CALC_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "nutrition": {
+            "type": "object",
+            "properties": {
+                "calories": {"type": "integer"}, "protein_g": {"type": "integer"},
+                "carbs_g": {"type": "integer"}, "fat_g": {"type": "integer"},
+                "fiber_g": {"type": "integer"}, "sugar_g": {"type": "integer"},
+                "sodium_mg": {"type": "integer"},
+            },
+            "additionalProperties": False,
+        },
+        "basis": {"type": "string"},
+        "assumptions": {"type": "string"},
+        "clarify": {"type": "string"},
+    },
+    "required": ["nutrition", "basis"],
+    "additionalProperties": False,
+}
+
+
+def calc_nutrition(text: str, units: str = "metric") -> dict:
+    """Estimate nutrition from a FREE-FORM meal description (any phrasing, with or
+    without quantities). Claude parses it; the trained model runs as a cross-check.
+    Returns {nutrition, basis, assumptions, clarify, nutrition_model}."""
+    text = (text or "").strip()
+    if not text:
+        return {"error": "empty"}
+    key = _api_key()
+    if not key:
+        return {"error": "no_key"}
+    import anthropic
+    client = anthropic.Anthropic(api_key=key)
+    system = (
+        "You are Su Chef's Nutritionist. The cook describes a meal in free form (any "
+        "phrasing, with or without amounts). Estimate its nutrition and fill the "
+        "schema. nutrition = calories + macros for what is described, per the basis "
+        "you state. basis = a short phrase saying what the numbers cover (e.g. 'the "
+        "whole meal as described' or 'per serving'). assumptions = ONE short line on "
+        "any assumptions (portion sizes, cooking method). If the description is too "
+        "vague to estimate well, set clarify to ONE short question AND still give your "
+        "best estimate. These are estimates, be realistic. No em dashes.\n\n"
+        + _UNITS.get(units, _UNITS["metric"]))
+    try:
+        resp = client.messages.create(
+            model=MODEL, max_tokens=400, system=system,
+            messages=[{"role": "user", "content": text}],
+            output_config={"format": {"type": "json_schema", "schema": _CALC_SCHEMA}},
+        )
+        data = json.loads("".join(b.text for b in resp.content if b.type == "text"))
+    except Exception as exc:
+        return {"error": exc.__class__.__name__}
+    model_nut = None
+    try:
+        from pipeline import tools as T
+        model_nut = T.estimate_nutrition({"ingredients": text})
+    except Exception:
+        model_nut = None
+    return {
+        "nutrition": data.get("nutrition"),
+        "basis": data.get("basis", ""),
+        "assumptions": data.get("assumptions", ""),
+        "clarify": data.get("clarify", ""),
+        "nutrition_model": model_nut,
+    }
+
+
 def _ask_claude(messages: list[dict], key: str, units: str = "metric",
                 grounding: str = "") -> dict:
     import anthropic

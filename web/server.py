@@ -99,15 +99,19 @@ def api_tts():
     import asyncio
     import io
     import edge_tts
+    import re
     data = request.get_json(force=True, silent=True) or {}
     text = (data.get("text") or "").strip()
     voice = _TTS_VOICES.get(data.get("lang", "en"), _TTS_VOICES["en"])
+    rate = data.get("rate", "+0%")
+    if not isinstance(rate, str) or not re.fullmatch(r"[+-]\d{1,3}%", rate):
+        rate = "+0%"
     if not text:
         return jsonify({"error": "no text"}), 400
 
     async def synth():
         buf = io.BytesIO()
-        async for ch in edge_tts.Communicate(text, voice).stream():
+        async for ch in edge_tts.Communicate(text, voice, rate=rate).stream():
             if ch["type"] == "audio":
                 buf.write(ch["data"])
         return buf.getvalue()
@@ -143,6 +147,15 @@ def api_estimate():
         return jsonify({"nutrition": T.estimate_nutrition(data)})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.post("/api/calc-nutrition")
+def api_calc_nutrition():
+    """Free-form meal description -> estimated nutrition (Claude + model cross-check).
+    Body: {text, units}."""
+    data = request.get_json(force=True, silent=True) or {}
+    return jsonify(companion.calc_nutrition(data.get("text", ""),
+                                            units=data.get("units", "metric")))
 
 
 @app.post("/api/search")
