@@ -12,6 +12,9 @@ venv/
 # Runtime user data (chats + pins) — personal, never committed
 data/
 
+# Raw downloaded datasets (large; regenerate via huggingface_hub)
+dataset/
+
 # Secrets
 .streamlit/secrets.toml
 

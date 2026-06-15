@@ -1,4 +1,12 @@
-streamlit>=1.40
+# Runtime deps for the deployed Flask app (kept lean for Railway).
+# The Streamlit app + voice input (faster-whisper) live in requirements-dev.txt.
+flask>=3.0
 anthropic>=0.40
-streamlit-js-eval>=0.1.7
-faster-whisper>=1.0
+pandas>=2.0
+numpy>=2.0
+# Pinned to the versions the model.pkl was trained/pickled with, so the deployed
+# host can unpickle it (mismatched sklearn -> "No module named '_loss'").
+scikit-learn==1.7.2
+joblib==1.5.2
+rank-bm25>=0.2.2
+edge-tts>=6.1

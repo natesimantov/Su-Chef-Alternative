@@ -1,0 +1,66 @@
+{
+  "schema": {
+    "recipe_name": "string",
+    "url": "string",
+    "image_url": "string",
+    "servings": "float",
+    "num_ingredients": "int",
+    "ingredient_text": "string",
+    "ingredient_lines": "string",
+    "course": "string",
+    "cuisine": "string",
+    "diet_tags": "string",
+    "calories": "float",
+    "protein_g": "float",
+    "carbs_g": "float",
+    "fat_g": "float",
+    "fiber_g": "float",
+    "sugar_g": "float",
+    "sodium_mg": "float"
+  },
+  "target": [
+    "calories",
+    "protein_g",
+    "carbs_g",
+    "fat_g"
+  ],
+  "allowed_values": {
+    "diet": [
+      "Vegetarian",
+      "Vegan",
+      "Gluten-Free",
+      "Dairy-Free",
+      "Keto"
+    ],
+    "course": [
+      "Appetizer",
+      "Bread",
+      "Breakfast",
+      "Dessert",
+      "Drink",
+      "Main",
+      "Salad",
+      "Side",
+      "Snack",
+      "Soup"
+    ]
+  },
+  "constraints": {
+    "calories": {
+      "min": 5,
+      "max": 2000
+    },
+    "servings": {
+      "min": 1
+    },
+    "num_ingredients": {
+      "min": 1
+    }
+  },
+  "assumptions": {
+    "per_serving": "nutrition columns = recipe total / servings",
+    "nutrients": "protein/carbs/fat/fiber/sugar from Edamam total_nutrients (PROCNT/CHOCDF/FAT/FIBTG/SUGAR); sodium NA in mg",
+    "diet_tags": "heuristic from Edamam health labels (Vegetarian/Vegan/Gluten-Free/Dairy-Free) + Keto (carbs <=10 g, fat-dominant per serving)"
+  },
+  "row_count": 38054
+}
