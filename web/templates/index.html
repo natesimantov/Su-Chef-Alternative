@@ -12,15 +12,11 @@
 <body>
   <!-- Mobile top bar -->
   <div class="mtop">
+    <button class="menubtn" id="mTopMenu" title="Menu" aria-label="Open menu"><span class="material-symbols-outlined">menu</span></button>
     <div class="brand" data-view="chat">Su&nbsp;Chef<span class="dot">.</span></div>
-    <nav class="mnav">
-      <a data-view="chat" class="active material-symbols-outlined" title="Chat">forum</a>
-      <a data-view="lab" class="material-symbols-outlined" title="Recipe Lab — cook to your macros (new!)" data-new="1">science</a>
-      <a data-view="saved" class="material-symbols-outlined" title="Saved">bookmark</a>
-      <a data-view="about" class="material-symbols-outlined" title="About Su Chef">info</a>
-      <a data-view="prefs" class="material-symbols-outlined" title="Preferences">settings</a>
-    </nav>
+    <span class="mtop-spacer"></span>
   </div>
+  <div id="scrim" class="scrim hidden"></div>
 
   <div class="app">
     <aside class="sidebar">
@@ -57,7 +53,6 @@
             <div class="eyebrow">Personal Kitchen Companion</div>
             <h1>What's Cooking?</h1>
             <p class="sub">Ask anything while you cook! I'll answer any kitchen question, suggest tips, fix problems, and keep you company.</p>
-            <button class="herocta" data-view="lab"><span class="material-symbols-outlined">science</span>Cook to your macros in Recipe Lab</button>
           </div>
           <div class="composer">
             <button id="mic" class="iconbtn" title="Tap to speak"><span class="material-symbols-outlined">mic</span></button>
@@ -69,41 +64,51 @@
 
         <!-- Recipe Lab -->
         <section id="v-lab" class="view">
-          <div class="eyebrow">Cook to your macros</div>
-          <h1 class="serif" style="font-size:40px;margin:0 0 6px;">Recipe Lab</h1>
-          <p class="sub" style="margin:0 0 18px;">Set your targets, pick any diets and a course, then find real recipes or generate a custom one. All nutrition is per serving.</p>
-          <div class="card lab-form">
-            <div class="grid-targets">
-              <label class="field"><span class="label">Calories</span><input id="t-cal" type="number" min="0" placeholder="e.g. 500"></label>
-              <label class="field"><span class="label">Protein (g)</span><input id="t-protein" type="number" min="0" placeholder="e.g. 35"></label>
-              <label class="field"><span class="label">Carbs (g)</span><input id="t-carbs" type="number" min="0" placeholder="optional"></label>
-              <label class="field"><span class="label">Fat (g)</span><input id="t-fat" type="number" min="0" placeholder="optional"></label>
-            </div>
-            <div class="field"><span class="label">Diets</span><div id="lab-diets" class="chipset"></div></div>
-            <div class="grid2">
-              <label class="field"><span class="label">Course</span><select id="lab-course"></select></label>
-              <label class="field"><span class="label">Search (optional)</span><input id="lab-query" type="text" placeholder='e.g. "salmon", "stir fry"'></label>
-            </div>
-            <div class="lab-actions">
-              <button id="lab-find" class="send"><span class="material-symbols-outlined">verified</span>Chef recipes</button>
-              <button id="lab-generate" class="send alt"><span class="material-symbols-outlined">auto_awesome</span>Generate New Recipe</button>
-            </div>
-            <p class="lab-hint">Chef recipes are real, kitchen-tested dishes from our cookbook with measured nutrition. Generate one builds a fresh recipe to your exact targets.</p>
-          </div>
-          <div id="lab-status" class="lab-status"></div>
-          <div id="lab-results" class="lab-results"></div>
+          <div class="eyebrow">Two tools, one lab</div>
+          <h1 class="serif lab-title" style="font-size:40px;margin:0 0 18px;">Recipe Lab</h1>
 
-          <div class="card est-card">
-            <div class="label">Estimate a meal</div>
-            <p class="sub" style="margin:6px 0 14px;">Already have a dish in mind? Paste its ingredients and Su Chef estimates the per-serving nutrition.</p>
-            <label class="field"><span class="label">Ingredients (one per line)</span><textarea id="est-ingredients" rows="4" placeholder="200g chicken breast&#10;2 cups cooked rice&#10;1 tbsp olive oil"></textarea></label>
-            <div class="grid2">
-              <label class="field"><span class="label">Servings</span><input id="est-servings" type="number" min="1" value="2"></label>
-              <label class="field"><span class="label">Course</span><select id="est-course"></select></label>
+          <section class="lab-tool">
+            <div class="lab-tool-head"><span class="lab-num">1</span>
+              <div><b>Find or build a recipe</b><p>Set targets, pick diets and a course, then find real chef recipes or generate a fresh one.</p></div>
             </div>
-            <button id="est-go" class="send"><span class="material-symbols-outlined">nutrition</span>Calculate Nutrition</button>
-            <div id="est-result"></div>
-          </div>
+            <div class="card lab-form">
+              <div class="grid-targets">
+                <label class="field"><span class="label">Calories</span><input id="t-cal" type="number" min="0" placeholder="e.g. 500"></label>
+                <label class="field"><span class="label">Protein (g)</span><input id="t-protein" type="number" min="0" placeholder="e.g. 35"></label>
+                <label class="field"><span class="label">Carbs (g)</span><input id="t-carbs" type="number" min="0" placeholder="optional"></label>
+                <label class="field"><span class="label">Fat (g)</span><input id="t-fat" type="number" min="0" placeholder="optional"></label>
+              </div>
+              <div class="field"><span class="label">Diets</span><div id="lab-diets" class="chipset"></div></div>
+              <div class="grid2">
+                <label class="field"><span class="label">Course</span><select id="lab-course"></select></label>
+                <label class="field"><span class="label">Search (optional)</span><input id="lab-query" type="text" placeholder='e.g. "salmon", "stir fry"'></label>
+              </div>
+              <div class="lab-actions">
+                <button id="lab-find" class="send"><span class="material-symbols-outlined">verified</span>Chef recipes</button>
+                <button id="lab-generate" class="send alt"><span class="material-symbols-outlined">auto_awesome</span>Generate New Recipe</button>
+              </div>
+              <p class="lab-hint">Chef recipes are real, kitchen-tested dishes with measured nutrition and a sourced photo. Generate builds a fresh recipe to your exact targets.</p>
+            </div>
+            <div id="lab-status" class="lab-status"></div>
+            <div id="lab-results" class="lab-results"></div>
+          </section>
+
+          <div class="lab-divider"><span>and</span></div>
+
+          <section class="lab-tool">
+            <div class="lab-tool-head"><span class="lab-num">2</span>
+              <div><b>Calculate a meal's nutrition</b><p>Already have a dish in mind? Paste its ingredients for a per-serving estimate.</p></div>
+            </div>
+            <div class="card est-card">
+              <label class="field"><span class="label">Ingredients (one per line)</span><textarea id="est-ingredients" rows="4" placeholder="200g chicken breast&#10;2 cups cooked rice&#10;1 tbsp olive oil"></textarea></label>
+              <div class="grid2">
+                <label class="field"><span class="label">Servings</span><input id="est-servings" type="number" min="1" value="2"></label>
+                <label class="field"><span class="label">Course</span><select id="est-course"></select></label>
+              </div>
+              <button id="est-go" class="send"><span class="material-symbols-outlined">nutrition</span>Calculate Nutrition</button>
+              <div id="est-result"></div>
+            </div>
+          </section>
         </section>
 
         <!-- Saved -->
@@ -116,21 +121,20 @@
 
         <!-- About -->
         <section id="v-about" class="view">
-          <div class="eyebrow">About</div>
-          <h1 class="serif" style="font-size:48px;margin:0 0 16px;">About Su&nbsp;Chef</h1>
-          <p class="about-lede">Your personal kitchen companion. Ask any cooking question by voice or text, build recipes around real nutrition goals, and check what's on your plate, all while you're still at the stove.</p>
-          <p class="about-body">Under the hood it pairs a conversational chef with a large food dataset and a trained nutrition model, so any recipe can be searched, generated, and measured against the way you want to eat.</p>
+          <div class="eyebrow">About Su Chef</div>
+          <h1 class="serif" style="font-size:40px;margin:0 0 16px;">Your private kitchen crew</h1>
+          <p class="about-lede">Fast, friendly help the moment you need it. Ask a burning question mid-cook, talk through a what if, or dream up a brand new dish from a craving. There is always someone in the kitchen with you.</p>
 
-          <h2 class="about-h2">What you can do</h2>
+          <h2 class="about-h2">How to use Su Chef</h2>
           <div class="use-cards">
             <div class="use-card"><span class="material-symbols-outlined">forum</span>
-              <b>Ask &amp; cook</b><p>Fire off any kitchen question and get an instant, spoken answer. “Out of buttermilk?” “Is my chicken done?”</p></div>
+              <b>Ask anything</b><p>"Which pan for a good sear?" "My caramel crystallized." "Steel or cast iron?" Instant, spoken answers.</p></div>
+            <div class="use-card"><span class="material-symbols-outlined">healing</span>
+              <b>Fix what went wrong</b><p>"My sauce broke." "Soup is too salty." Quick saves so dinner still happens.</p></div>
             <div class="use-card"><span class="material-symbols-outlined">science</span>
-              <b>Build in Recipe Lab</b><p>Set calorie and macro targets, pick diets and a course, then find real chef recipes or generate a new one that fits.</p></div>
+              <b>Build to your macros</b><p>Set calories and protein, pick a diet, and find a real chef recipe or generate a new one.</p></div>
             <div class="use-card"><span class="material-symbols-outlined">nutrition</span>
-              <b>Calculate nutrition</b><p>Paste any meal's ingredients and get its estimated per-serving calories, protein, carbs, and fat.</p></div>
-            <div class="use-card"><span class="material-symbols-outlined">bookmark</span>
-              <b>Save &amp; revisit</b><p>Pin answers you love, keep your recipes, and jump back into past sessions anytime.</p></div>
+              <b>Calculate nutrition</b><p>Paste a dish's ingredients for a per-serving calorie and macro estimate.</p></div>
           </div>
 
           <h2 class="about-h2">The data &amp; model behind it</h2>
@@ -206,7 +210,10 @@
               </select>
             </div>
             <div class="field"><span class="label">Voice</span>
-              <select id="voice" style="max-width:280px;height:46px;border:1px solid var(--outline);border-radius:10px;background:var(--surface);color:var(--ink);padding:0 12px;"></select>
+              <div class="voice-row">
+                <select id="voice"></select>
+                <button id="voiceTest" class="ctrlbtn" type="button" title="Hear a sample"><span class="material-symbols-outlined">play_arrow</span>Sample</button>
+              </div>
             </div>
           </div>
         </section>

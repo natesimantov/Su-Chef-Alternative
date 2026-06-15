@@ -80,6 +80,12 @@ def api_ask():
 
 
 _TTS_VOICES = {
+    "american-f": "en-US-AriaNeural", "american-m": "en-US-GuyNeural",
+    "british-f": "en-GB-SoniaNeural", "british-m": "en-GB-RyanNeural",
+    "irish-f": "en-IE-EmilyNeural", "irish-m": "en-IE-ConnorNeural",
+    "australian-f": "en-AU-NatashaNeural", "australian-m": "en-AU-WilliamNeural",
+    "indian-f": "en-IN-NeerjaNeural", "indian-m": "en-IN-PrabhatNeural",
+    # legacy keys (older saved prefs)
     "en": "en-US-AriaNeural", "en-us": "en-US-AriaNeural",
     "en-gb": "en-GB-SoniaNeural", "en-ie": "en-IE-EmilyNeural",
     "en-au": "en-AU-NatashaNeural", "en-in": "en-IN-NeerjaNeural",

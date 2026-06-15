@@ -6,7 +6,7 @@ const state = {
   messages: [],
   units: localStorage.getItem('units') || 'metric',
   theme: ['archive', 'nocturnal'].includes(localStorage.getItem('theme')) ? localStorage.getItem('theme') : 'archive',
-  audioOn: localStorage.getItem('audioOn') !== 'off',
+  audioOn: localStorage.getItem('audioOn') === 'on',
   busy: false,
 };
 const $ = (id) => document.getElementById(id);
@@ -34,6 +34,7 @@ function syncCurrent() {
   persist(); renderSessions();
 }
 function newSession() {
+  closeDrawer();
   const cur = currentSession();
   if (!cur.messages.length) { showView('chat'); qInput.focus(); return; }  // reuse empty
   syncCurrent();
@@ -42,6 +43,7 @@ function newSession() {
   persist(); render(); renderSessions(); showView('chat'); qInput.focus();
 }
 function loadSession(id) {
+  closeDrawer();
   syncCurrent(); currentId = id;
   state.messages = currentSession().messages;
   persist(); render(); renderSessions(); showView('chat');
@@ -78,17 +80,30 @@ function showView(v) {
   if (v === 'lab') loadLab();
 }
 document.querySelectorAll('[data-view]').forEach(a =>
-  a.addEventListener('click', () => { showView(a.dataset.view); if (a.dataset.view === 'chat') qInput.focus(); }));
+  a.addEventListener('click', () => {
+    closeDrawer();
+    if ($('modal')) $('modal').classList.add('hidden');
+    showView(a.dataset.view);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (a.dataset.view === 'chat' && qInput) qInput.focus();
+  }));
 if ($('newSide')) $('newSide').onclick = newSession;
 if ($('newTop')) $('newTop').onclick = newSession;
 
-/* hamburger nav menu (desktop) */
+/* hamburger nav menu (desktop popover) */
 const menuBtn = $('menuBtn'), navMenu = $('navMenu');
 if (menuBtn && navMenu) {
   menuBtn.onclick = (e) => { e.stopPropagation(); navMenu.classList.toggle('open'); };
   navMenu.querySelectorAll('[data-view]').forEach(a => a.addEventListener('click', () => navMenu.classList.remove('open')));
   document.addEventListener('click', (e) => { if (!navMenu.contains(e.target) && !menuBtn.contains(e.target)) navMenu.classList.remove('open'); });
 }
+
+/* mobile sidebar drawer */
+const sidebarEl = document.querySelector('.sidebar'), scrimEl = $('scrim');
+function openDrawer() { if (sidebarEl) sidebarEl.classList.add('open'); if (scrimEl) scrimEl.classList.remove('hidden'); }
+function closeDrawer() { if (sidebarEl) sidebarEl.classList.remove('open'); if (scrimEl) scrimEl.classList.add('hidden'); }
+if ($('mTopMenu')) $('mTopMenu').onclick = openDrawer;
+if (scrimEl) scrimEl.onclick = closeDrawer;
 
 /* ---------- theme / units / audio (Preferences) ---------- */
 function applyTheme(t) { document.documentElement.setAttribute('data-theme', t); state.theme = t; localStorage.setItem('theme', t); }
@@ -112,23 +127,28 @@ function setAudio(on) {
 setAudio(state.audioOn);
 if ($('audioToggle')) $('audioToggle').onclick = () => setAudio(!state.audioOn);
 
-/* voice persona list */
+/* voice list — real English accents, male + female (free edge-tts) */
 function fillVoices() {
   const sel = $('voice'); if (!sel || sel.options.length) return;
-  [['Aria', 'en-us'], ['Sonia', 'en-gb'], ['Emily', 'en-ie'],
-   ['Natasha', 'en-au'], ['Neerja', 'en-in']]
+  [['Aria · American (F)', 'american-f'], ['Guy · American (M)', 'american-m'],
+   ['Sonia · British (F)', 'british-f'], ['Ryan · British (M)', 'british-m'],
+   ['Emily · Irish (F)', 'irish-f'], ['Connor · Irish (M)', 'irish-m'],
+   ['Natasha · Australian (F)', 'australian-f'], ['William · Australian (M)', 'australian-m'],
+   ['Neerja · Indian (F)', 'indian-f'], ['Prabhat · Indian (M)', 'indian-m']]
     .forEach(([label, lang]) => sel.appendChild(new Option(label, lang)));
+  const saved = localStorage.getItem('voice'); if (saved) sel.value = saved;
+  sel.onchange = () => localStorage.setItem('voice', sel.value);
 }
 fillVoices();
+if ($('voiceTest')) $('voiceTest').onclick = () =>
+  playTTS("Hi, I'm Su Chef. Let's cook something delicious together.", ($('voice') || {}).value || 'american-f');
 
 function stopSpeak() {
   if (currentAudio) { try { currentAudio.pause(); } catch (e) {} currentAudio = null; }
   try { window.speechSynthesis.cancel(); } catch (e) {}
 }
-async function speak(text) {
-  if (!state.audioOn || !text) return;
+async function playTTS(text, lang) {
   stopSpeak();
-  const lang = ($('voice') || {}).value || 'en';
   const clean = convertTemps(text, state.units);
   try {
     const res = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: clean, lang }) });
@@ -137,6 +157,10 @@ async function speak(text) {
     currentAudio = a;
     a.play().catch(() => fallbackSpeak(clean, lang));
   } catch (e) { fallbackSpeak(clean, lang); }
+}
+async function speak(text) {
+  if (!state.audioOn || !text) return;
+  playTTS(text, ($('voice') || {}).value || 'american-f');
 }
 function fallbackSpeak(text, lang) {
   try {
@@ -169,9 +193,23 @@ async function ask(text) {
   }
   state.busy = false;
 }
+const SUGGESTIONS = [
+  'e.g. "out of buttermilk, what now?"',
+  'e.g. "which pan for searing salmon?"',
+  'e.g. "my caramel crystallized, help"',
+  'e.g. "how do I fix a broken sauce?"',
+  'e.g. "steak medium-rare temp?"',
+  'e.g. "substitute for an egg in baking?"',
+  'e.g. "why is my rice mushy?"',
+  'e.g. "make me a cozy weeknight pasta"',
+  'e.g. "how long to rest a roast?"',
+  'e.g. "season a cast iron pan?"',
+];
 function updatePlaceholder() {
-  qInput.placeholder = state.messages.length ? 'Ask a follow-up question…' : 'e.g. "out of buttermilk — what now?"';
+  qInput.placeholder = state.messages.length ? 'Ask a follow-up question...'
+    : SUGGESTIONS[Math.floor(Math.random() * SUGGESTIONS.length)];
 }
+if (qInput) qInput.addEventListener('focus', () => { if (!state.messages.length && !qInput.value) updatePlaceholder(); });
 
 /* ---------- render thread (newest-first) ---------- */
 function render() {
@@ -214,10 +252,30 @@ function chip(text, isRecipe) { const b = el('button', 'chip' + (isRecipe ? ' re
 /* ---------- recipe widget (two-column editorial + nutrition) ---------- */
 function renderRecipe(r) {
   const card = el('div', 'recipe');
+  if (r.image_url) {  // chef/measured recipes: real sourced photo (never AI)
+    const ph = el('div', 'recipe-photo');
+    const img = document.createElement('img'); img.src = r.image_url; img.alt = r.title || ''; img.loading = 'lazy';
+    img.onerror = () => ph.remove();
+    ph.appendChild(img); card.appendChild(ph);
+  } else if (r.expert_review || r.nutrition_model) {  // generated: abstract header, no photo
+    const ab = el('div', 'recipe-abstract'); ab.innerHTML = '<span class="material-symbols-outlined">restaurant</span>';
+    card.appendChild(ab);
+  }
   const head = el('div', 'recipe-head');
   head.appendChild(el('h3', '', r.title || 'Recipe'));
-  head.appendChild(addRecipeBtn(r));
+  const actions = el('div', 'recipe-actions');
+  let panel = null;
+  if (r.expert_review) {
+    panel = renderExpertReview(r.expert_review); panel.classList.add('hidden');
+    const erBtn = el('button', 'erbtn');
+    erBtn.innerHTML = '<span class="material-symbols-outlined">groups</span>Expert review<span class="material-symbols-outlined chev">expand_more</span>';
+    erBtn.onclick = (e) => { e.stopPropagation(); const open = !panel.classList.toggle('hidden'); erBtn.classList.toggle('on', open); };
+    actions.appendChild(erBtn);
+  }
+  actions.appendChild(addRecipeBtn(r));
+  head.appendChild(actions);
   card.appendChild(head);
+  if (panel) card.appendChild(panel);
   if (r.intro) card.appendChild(el('p', 'intro', cv(r.intro)));
   const meta = el('div', 'meta');
   if (r.servings) meta.appendChild(el('span', 'pill', `${r.servings} servings`));
@@ -244,41 +302,36 @@ function renderRecipe(r) {
     cols.appendChild(right);
   } else { cols.classList.add('single'); }
   card.appendChild(cols);
-  if (r.expert_review) card.appendChild(renderExpertReview(r.expert_review));
   attachAskAbout(card);
   return card;
 }
 function renderExpertReview(er) {
-  const d = document.createElement('details'); d.className = 'expert-review';
-  const sum = document.createElement('summary');
-  sum.innerHTML = '<span class="material-symbols-outlined">groups</span>Expert review';
-  d.appendChild(sum);
-  const body = el('div', 'er-body');
-  const rows = [];
-  if (er.nutrition_note) rows.push(['#9e0027', 'Nutritionist', cv(er.nutrition_note)]);
-  const ds = er.diet_safety || {};
-  const dsText = [
-    (ds.diet_flags && ds.diet_flags.length) ? 'Suitable for ' + ds.diet_flags.join(', ') : '',
-    (ds.allergens && ds.allergens.length) ? 'Allergens: ' + ds.allergens.join(', ') : 'No common allergens flagged',
-    ds.safety_note || '',
-  ].filter(Boolean).join(' · ');
-  if (dsText) rows.push(['#2a6f7f', 'Dietitian & Safety', cv(dsText)]);
-  const eq = er.equipment || {};
-  const eqText = [
-    (eq.tools && eq.tools.length) ? 'Tools: ' + eq.tools.join(', ') : '',
-    (eq.substitutions && eq.substitutions.length) ? 'Swaps: ' + eq.substitutions.join(', ') : '',
-    eq.note || '',
-  ].filter(Boolean).join(' · ');
-  if (eqText) rows.push(['#b4501f', 'Equipment & Subs', cv(eqText)]);
-  rows.forEach(([color, name, text]) => {
+  const panel = el('div', 'expert-review');
+  const chipRow = (items, cls) => { const w = el('div', 'er-chips'); items.forEach(t => w.appendChild(el('span', 'er-chip' + (cls ? ' ' + cls : ''), t))); return w; };
+  const addRow = (color, name, content) => {
     const row = el('div', 'expert-row');
     const dot = el('span', 'expert-dot'); dot.style.background = color; row.appendChild(dot);
-    const txt = el('div', 'expert-txt');
-    txt.appendChild(el('b', '', name)); txt.appendChild(el('span', '', ' ' + text));
-    row.appendChild(txt); body.appendChild(row);
-  });
-  d.appendChild(body);
-  return d;
+    const txt = el('div', 'expert-txt'); txt.appendChild(el('b', '', name));
+    if (content) txt.appendChild(content);
+    row.appendChild(txt); panel.appendChild(row);
+  };
+  if (er.nutrition_note) addRow('#9e0027', 'Nutritionist', el('span', 'er-line', cv(er.nutrition_note)));
+  const ds = er.diet_safety || {};
+  const dw = el('div', '');
+  if (ds.diet_flags && ds.diet_flags.length) dw.appendChild(chipRow(ds.diet_flags, 'ok'));
+  if (ds.allergens && ds.allergens.length) dw.appendChild(chipRow(ds.allergens.map(a => '⚠ ' + a), 'warn'));
+  else dw.appendChild(el('span', 'er-line', 'No common allergens flagged.'));
+  if (ds.safety_note) dw.appendChild(el('span', 'er-line', cv(ds.safety_note)));
+  if (dw.children.length) addRow('#2a6f7f', 'Dietitian & Safety', dw);
+  const eq = er.equipment || {};
+  const ew = el('div', '');
+  if (eq.tools && eq.tools.length) ew.appendChild(chipRow(eq.tools, ''));
+  if (eq.substitutions && eq.substitutions.length) {
+    const ul = el('ul', 'er-swaps'); eq.substitutions.forEach(s => ul.appendChild(el('li', '', cv(String(s).replace(/->/g, '→'))))); ew.appendChild(ul);
+  }
+  if (eq.note) ew.appendChild(el('span', 'er-line', cv(eq.note)));
+  if (ew.children.length) addRow('#b4501f', 'Equipment & Subs', ew);
+  return panel;
 }
 function renderNutrition(n, measured) {
   const wrap = el('div', 'nutri');
@@ -404,6 +457,26 @@ function labTargets() {
   return t;
 }
 function labDiets() { return [...document.querySelectorAll('#lab-diets .dchip.on')].map(b => b.dataset.diet); }
+function renderChefResult(h) {
+  const d = document.createElement('details'); d.className = 'chef-result';
+  const sum = document.createElement('summary'); sum.className = 'chef-sum';
+  const thumb = el('div', 'chef-thumb');
+  if (h.image_url) { const img = document.createElement('img'); img.src = h.image_url; img.alt = ''; img.loading = 'lazy'; img.onerror = () => thumb.classList.add('noimg'); thumb.appendChild(img); }
+  else thumb.classList.add('noimg');
+  sum.appendChild(thumb);
+  const info = el('div', 'chef-info');
+  info.appendChild(el('div', 'chef-title', h.title || 'Recipe'));
+  const n = h.nutrition || {};
+  const tags = [h.course, h.diet_tags].filter(Boolean).join(' · ');
+  info.appendChild(el('div', 'chef-macros', `${Math.round(n.calories || 0)} kcal · ${Math.round(n.protein_g || 0)}g protein` + (tags ? ' · ' + tags : '')));
+  sum.appendChild(info);
+  sum.appendChild(el('span', 'chev material-symbols-outlined', 'expand_more'));
+  d.appendChild(sum);
+  const holder = el('div', 'chef-body'); d.appendChild(holder);
+  let built = false;
+  d.addEventListener('toggle', () => { if (d.open && !built) { built = true; holder.appendChild(renderRecipe({ ...h, measured: true })); } });
+  return d;
+}
 async function labRun(mode) {
   const status = $('lab-status'), out = $('lab-results');
   const body = { targets: labTargets(), diets: labDiets(), course: $('lab-course').value, query: $('lab-query').value.trim(), units: state.units };
@@ -412,8 +485,8 @@ async function labRun(mode) {
     if (mode === 'find') {
       const d = await (await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
       const hits = d.results || [];
-      status.textContent = hits.length ? `${hits.length} chef recipes matching your targets` : 'No matches — try widening your targets or diets.';
-      hits.forEach(h => out.appendChild(renderRecipe({ ...h, measured: true })));
+      status.textContent = hits.length ? `${hits.length} chef recipes matching your targets` : 'No matches. Try widening your targets or diets.';
+      hits.forEach(h => out.appendChild(renderChefResult(h)));
     } else {
       const d = await (await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
       if (d.error || !d.recipe) { status.textContent = d.answer || 'Could not generate a recipe.'; return; }
@@ -435,6 +508,7 @@ function renderFit(fit) {
 
 /* ---------- About (estimator + model card) ---------- */
 function mdToHtml(md) {
+  md = (md || '').replace(/\s*—\s*/g, ' - ');  // no em dashes in the UI
   const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
   let html = '', inList = false;
@@ -469,25 +543,39 @@ let recog = null, recognizing = false;
 if (micBtn && !SpeechRec) {
   micBtn.onclick = () => { qInput.placeholder = 'Voice input needs Chrome or Edge. Type instead.'; };
 } else if (micBtn) {
-  micBtn.onclick = () => {
-    if (recognizing) { try { recog.stop(); } catch (e) {} return; }
+  let finalText = '';
+  const startRecog = () => {
     recog = new SpeechRec();
-    recog.lang = 'en-US'; recog.interimResults = true; recog.maxAlternatives = 1; recog.continuous = false;
-    recog.onstart = () => { recognizing = true; micBtn.classList.add('listening'); qInput.placeholder = 'Listening…'; };
+    recog.lang = 'en-US'; recog.interimResults = true; recog.continuous = true; recog.maxAlternatives = 1;
+    finalText = '';
+    recog.onstart = () => { recognizing = true; micBtn.classList.add('listening'); qInput.placeholder = 'Listening, speak now...'; };
     recog.onresult = (e) => {
-      let text = '';
-      for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
-      qInput.value = text.trim();
+      let interim = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += t; else interim += t;
+      }
+      qInput.value = (finalText + interim).trim();
+      if (finalText.trim()) { try { recog.stop(); } catch (e) {} }  // got a full phrase -> finish + ask
     };
     recog.onerror = (e) => {
-      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') qInput.placeholder = 'Mic blocked. Allow access or type.';
+      const msg = { 'no-speech': "Didn't catch that. Tap the mic and speak.",
+        'audio-capture': 'No microphone found.',
+        'not-allowed': 'Mic blocked. Allow access in your browser.',
+        'service-not-allowed': 'Mic blocked. Allow access in your browser.',
+        'network': 'Network issue with speech. Try again.' }[e.error] || 'Voice error. Try again.';
+      qInput.placeholder = msg;
     };
     recog.onend = () => {
-      recognizing = false; micBtn.classList.remove('listening'); updatePlaceholder();
-      const said = (qInput.value || '').trim();
-      if (said) ask(said);
+      recognizing = false; micBtn.classList.remove('listening');
+      const said = (finalText || qInput.value || '').trim();
+      if (said) ask(said); else updatePlaceholder();
     };
-    try { recog.start(); } catch (e) {}
+    try { recog.start(); } catch (e) { recognizing = false; micBtn.classList.remove('listening'); }
+  };
+  micBtn.onclick = () => {
+    if (recognizing) { try { recog.stop(); } catch (e) {} return; }
+    startRecog();
   };
 }
 
