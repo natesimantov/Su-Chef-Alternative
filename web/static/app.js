@@ -552,16 +552,23 @@ function mdToHtml(md) {
   md = (md || '').replace(/\s*—\s*/g, ' - ');  // no em dashes in the UI
   const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const inline = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Join soft-wrapped continuation lines so a wrapped bullet/paragraph stays one block.
+  let items = [], cur = null;
+  md.split('\n').forEach(raw => {
+    const line = raw.trim();
+    if (line === '') { cur = null; items.push({ t: 'blank' }); }
+    else if (/^#{1,3}\s+/.test(line)) { cur = null; items.push({ t: 'h', n: line.match(/^#+/)[0].length, s: line.replace(/^#{1,3}\s+/, '') }); }
+    else if (/^[-*]\s+/.test(line)) { cur = { t: 'li', s: line.replace(/^[-*]\s+/, '') }; items.push(cur); }
+    else if (cur) { cur.s += ' ' + line; }
+    else { cur = { t: 'p', s: line }; items.push(cur); }
+  });
   let html = '', inList = false;
   const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
-  (md || '').split('\n').forEach(raw => {
-    const line = raw.trimEnd();
-    if (/^###\s+/.test(line)) { closeList(); html += '<h4>' + inline(line.replace(/^###\s+/, '')) + '</h4>'; }
-    else if (/^##\s+/.test(line)) { closeList(); html += '<h3>' + inline(line.replace(/^##\s+/, '')) + '</h3>'; }
-    else if (/^#\s+/.test(line)) { closeList(); html += '<h2>' + inline(line.replace(/^#\s+/, '')) + '</h2>'; }
-    else if (/^[-*]\s+/.test(line)) { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(line.replace(/^[-*]\s+/, '')) + '</li>'; }
-    else if (line === '') { closeList(); }
-    else { closeList(); html += '<p>' + inline(line) + '</p>'; }
+  items.forEach(it => {
+    if (it.t === 'li') { if (!inList) { html += '<ul>'; inList = true; } html += '<li>' + inline(it.s) + '</li>'; return; }
+    closeList();
+    if (it.t === 'h') { const tag = it.n === 1 ? 'h2' : it.n === 2 ? 'h3' : 'h4'; html += '<' + tag + '>' + inline(it.s) + '</' + tag + '>'; }
+    else if (it.t === 'p') { html += '<p>' + inline(it.s) + '</p>'; }
   });
   closeList();
   return html;
@@ -577,66 +584,44 @@ async function loadAbout() {
   if (det) det.addEventListener('toggle', () => { if (det.open && !frame.src && frame.dataset.src) frame.src = frame.dataset.src; });
 }
 
-/* ---------- voice input (browser SpeechRecognition, no server needed) ---------- */
+/* ---------- voice input (browser SpeechRecognition; it manages its own mic) ---------- */
 const micBtn = $('mic');
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-let recog = null, recognizing = false, micStream = null, micCtx = null, micRaf = 0, lastErr = '', micStart = 0;
-function stopMicViz() {
-  cancelAnimationFrame(micRaf);
-  if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-  if (micCtx) { try { micCtx.close(); } catch (e) {} micCtx = null; }
-  if (micBtn) micBtn.style.removeProperty('--vol');
-}
-async function startMicViz() {  // explicit permission + reactive level (real "listening" feedback)
-  try {
-    micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    micCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const an = micCtx.createAnalyser(); an.fftSize = 256;
-    micCtx.createMediaStreamSource(micStream).connect(an);
-    const buf = new Uint8Array(an.fftSize);
-    const tick = () => {
-      an.getByteTimeDomainData(buf);
-      let s = 0; for (let i = 0; i < buf.length; i++) { const d = buf[i] - 128; s += d * d; }
-      micBtn.style.setProperty('--vol', Math.min(1, Math.sqrt(s / buf.length) / 30).toFixed(2));
-      micRaf = requestAnimationFrame(tick);
-    };
-    tick(); return true;
-  } catch (e) { return false; }
-}
-function endVoice() {
-  recognizing = false; if (micBtn) micBtn.classList.remove('listening'); stopMicViz();
-  const said = (qInput.value || '').trim();
-  if (!said && lastErr && (Date.now() - micStart < 1500)) {
-    qInput.placeholder = 'Voice input is blocked in this browser (e.g. Brave). Use Edge or Chrome.';
-  } else if (said) { ask(said); }
-  else updatePlaceholder();
-}
+let recog = null, recognizing = false;
 if (micBtn && !SpeechRec) {
-  micBtn.onclick = () => { qInput.placeholder = 'Voice input needs Chrome or Edge. Type instead.'; };
+  micBtn.onclick = () => { qInput.placeholder = 'Voice input needs Chrome or Edge (Brave/Firefox block it). Type instead.'; };
 } else if (micBtn) {
-  let finalText = '';
-  const startRecog = async () => {
-    lastErr = ''; finalText = ''; micStart = Date.now();
-    if (!(await startMicViz())) { qInput.placeholder = 'Mic blocked. Allow microphone access, then tap again.'; return; }
+  let finalText = '', lastErr = '';
+  const start = () => {
+    finalText = ''; lastErr = '';
     recog = new SpeechRec();
     recog.lang = 'en-US'; recog.interimResults = true; recog.continuous = true; recog.maxAlternatives = 1;
     recog.onstart = () => { recognizing = true; micBtn.classList.add('listening'); qInput.placeholder = 'Listening, speak now...'; };
     recog.onresult = (e) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) finalText += t; else interim += t;
+        const tr = e.results[i][0].transcript;
+        if (e.results[i].isFinal) finalText += tr; else interim += tr;
       }
       qInput.value = (finalText + interim).trim();
-      if (finalText.trim()) { try { recog.stop(); } catch (e) {} }  // full phrase -> finish + ask
+      if (finalText.trim()) { try { recog.stop(); } catch (e) {} }  // got a full phrase -> finish + ask
     };
     recog.onerror = (e) => { lastErr = e.error || 'error'; };
-    recog.onend = endVoice;
-    try { recog.start(); } catch (e) { stopMicViz(); micBtn.classList.remove('listening'); recognizing = false; }
+    recog.onend = () => {
+      recognizing = false; micBtn.classList.remove('listening');
+      const said = (qInput.value || '').trim();
+      if (said) { ask(said); return; }
+      if (lastErr === 'not-allowed' || lastErr === 'service-not-allowed')
+        qInput.placeholder = 'Mic blocked. Allow access, or use Edge/Chrome (Brave blocks voice).';
+      else if (lastErr === 'no-speech') qInput.placeholder = "Didn't catch that. Tap the mic and speak.";
+      else if (lastErr) qInput.placeholder = 'Voice unavailable here. Try Edge or Chrome.';
+      else updatePlaceholder();
+    };
+    try { recog.start(); } catch (e) { recognizing = false; micBtn.classList.remove('listening'); }
   };
   micBtn.onclick = () => {
     if (recognizing) { try { recog.stop(); } catch (e) {} return; }
-    startRecog();
+    start();
   };
 }
 

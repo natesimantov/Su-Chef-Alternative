@@ -355,11 +355,16 @@ iframe.eda { width:100%; height:560px; border:1px solid var(--hairline); border-
 @keyframes tspec { 0%,100% { height:5px; opacity:.5; } 50% { height:18px; opacity:1; } }
 .tlabel { font-size:16px; font-style:italic; }
 
-/* reactive mic "listening" ring (driven by --vol from getUserMedia) */
+/* mic "listening" pulse (SpeechRecognition manages its own mic, no getUserMedia) */
 .iconbtn { position:relative; }
-.iconbtn.listening { background:var(--accent); animation:none; }
-.iconbtn.listening::after { content:''; position:absolute; inset:-2px; border-radius:50%; pointer-events:none;
-  box-shadow:0 0 0 calc(3px + var(--vol, 0.1) * 18px) rgba(196,30,58,.22); transition:box-shadow .07s linear; }
+.iconbtn.listening { background:var(--accent); animation:micpulse 1.3s ease-out infinite; }
+@keyframes micpulse { 0% { box-shadow:0 0 0 0 rgba(196,30,58,.5); } 70% { box-shadow:0 0 0 16px rgba(196,30,58,0); }
+  100% { box-shadow:0 0 0 0 rgba(196,30,58,0); } }
+
+/* hide number-input spinner arrows (calorie/macro targets are estimates) */
+input[type=number]::-webkit-outer-spin-button,
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+input[type=number] { -moz-appearance:textfield; appearance:textfield; }
 .boxlink { display:block; padding:16px 0; border-bottom:1px solid var(--hairline); cursor:pointer; }
 .boxlink:hover .t { color:var(--accent); }
 .boxlink .t { font-family:'EB Garamond',serif; font-size:20px; }
@@ -388,8 +393,9 @@ iframe.eda { width:100%; height:560px; border:1px solid var(--hairline); border-
   color:var(--on-primary); font-weight:700; cursor:pointer; text-transform:uppercase; letter-spacing:0.05em; }
 .hidden { display:none !important; }
 
-/* ---------- Sidebar: hamburger + brand + New + Recent sessions ---------- */
-.sidebar { position:relative; }
+/* ---------- Sidebar: brand + New topic + Recent sessions ---------- */
+/* NOTE: .sidebar must NOT be position:relative — it would override the mobile
+   drawer's position:fixed and keep the sidebar in flow, squishing the content. */
 .sidebar-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:0 4px 22px; }
 .sidebar-head .brand { padding:0; }
 .brand[data-view] { cursor:pointer; }
@@ -505,7 +511,7 @@ iframe.eda { width:100%; height:560px; border:1px solid var(--hairline); border-
 .lab-results { display:flex; flex-direction:column; gap:18px; }
 .fit { display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding:12px 16px; border-radius:14px;
   background:var(--surface-3); }
-.fit.ok { background:color-mix(in srgb, var(--primary) 12%, var(--card)); border:1px solid var(--primary); }
+.fit.ok { background:var(--surface-3); border:1px solid var(--brand2); }
 .fit-head { font-family:'Hanken Grotesk',sans-serif; font-weight:700; text-transform:uppercase;
   letter-spacing:0.05em; font-size:13px; color:var(--accent); }
 .fit-m { font-size:13px; color:var(--muted); background:var(--card); border:1px solid var(--hairline);
