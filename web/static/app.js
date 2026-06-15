@@ -19,9 +19,12 @@ function setLS(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
 function mkSession() { return { id: 'S' + Date.now() + Math.random().toString(36).slice(2, 6), title: '', messages: [], ts: Date.now() }; }
 
 let sessions = getLS('su_sessions');
-let currentId = localStorage.getItem('su_current');
-if (!Array.isArray(sessions) || !sessions.length) { const s = mkSession(); sessions = [s]; currentId = s.id; }
-if (!sessions.find(s => s.id === currentId)) currentId = sessions[0].id;
+if (!Array.isArray(sessions)) sessions = [];
+sessions = sessions.filter(s => s && Array.isArray(s.messages) && s.messages.length);  // keep only real chats
+// Always land on a fresh home screen; past chats stay in the sidebar (Claude-style).
+const _firstSession = mkSession();
+sessions.unshift(_firstSession);
+let currentId = _firstSession.id;
 state.messages = currentSession().messages;
 
 function currentSession() { return sessions.find(s => s.id === currentId) || sessions[0]; }
