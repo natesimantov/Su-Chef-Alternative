@@ -250,13 +250,10 @@ iframe.eda { width:100%; height:560px; border:1px solid var(--hairline); border-
 .er-swaps { margin:2px 0 0; padding-left:18px; }
 .er-swaps li { font-size:13px; margin:2px 0; color:var(--muted); }
 
-/* recipe images: real photo (chef) vs abstract header (generated) */
-.recipe-photo { margin:-26px -28px 18px; overflow:hidden; max-height:280px; }
-.recipe-photo img { width:100%; max-height:280px; object-fit:cover; display:block; }
-.recipe-abstract { margin:-26px -28px 18px; height:88px;
-  background:linear-gradient(120deg, var(--surface-3), var(--surface-2));
-  display:flex; align-items:center; justify-content:center; }
-.recipe-abstract .material-symbols-outlined { font-size:38px; color:var(--accent); opacity:.45; }
+/* recipe image: real sourced photo (chef recipes only; never AI) */
+.recipe-photo { margin:-26px -28px 18px; overflow:hidden; height:220px; background:var(--surface-3);
+  border-radius:20px 20px 0 0; }
+.recipe-photo img { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
 
 /* chef-recipe collapsible results */
 .lab-results { gap:10px; }
@@ -273,7 +270,7 @@ iframe.eda { width:100%; height:560px; border:1px solid var(--hairline); border-
 .chef-result[open] .chev { transform:rotate(180deg); }
 .chef-body { padding:0 14px 14px; }
 .chef-body .recipe { box-shadow:none; border:none; padding:14px 0 0; border-radius:0; }
-.chef-body .recipe-photo, .chef-body .recipe-abstract { margin:0 0 14px; border-radius:12px; }
+.chef-body .recipe-photo { margin:0 0 14px; height:200px; border-radius:12px; }
 
 /* mobile drawer + scrim */
 .mtop-spacer { flex:1; }
@@ -548,3 +545,79 @@ input[type=number] { -moz-appearance:textfield; appearance:textfield; }
   border:none; background:var(--card); color:var(--ink); cursor:pointer; box-shadow:var(--shadow-2);
   display:inline-flex; align-items:center; justify-content:center; z-index:2; }
 .modal-close:hover { color:var(--accent); }
+
+/* ============ Round 18: experts tool, servings, share, ideas, sticky composer ============ */
+/* Share button (sits beside Add to recipes; same pill language) */
+.sharerec { flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 14px;
+  border:1px solid var(--outline); border-radius:9999px; background:var(--card); color:var(--ink);
+  font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:12px; cursor:pointer; white-space:nowrap; }
+.sharerec:hover { border-color:var(--accent); color:var(--accent); }
+.sharerec .material-symbols-outlined { font-size:18px; }
+
+/* Servings stepper (in the meta row; smart AI rescale on the +/- arrows) */
+.servings-step { display:inline-flex; align-items:center; gap:2px; background:var(--surface-3);
+  border-radius:9999px; padding:3px; }
+.servings-step.loading { opacity:.7; }
+.sv-btn { width:26px; height:26px; border-radius:9999px; border:none; background:var(--card); color:var(--ink);
+  cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+.sv-btn:hover:not(:disabled) { color:var(--accent); }
+.sv-btn:disabled { opacity:.4; cursor:default; }
+.sv-btn .material-symbols-outlined { font-size:16px; }
+.sv-num { font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:12px; text-transform:uppercase;
+  letter-spacing:.05em; padding:0 8px; min-width:84px; text-align:center; color:var(--ink); }
+
+/* "Consult the experts" tool (a tool like the Recipe Lab ones, bottom-left) */
+.experts-tool { margin-top:20px; border:1px solid var(--hairline); border-radius:14px; padding:12px 14px;
+  background:var(--surface-2); }
+.experts-head { display:inline-flex; align-items:center; gap:7px; font-family:'Hanken Grotesk',sans-serif;
+  text-transform:uppercase; letter-spacing:.08em; font-size:11px; font-weight:800; color:var(--muted);
+  padding:6px 12px; border:1px solid var(--hairline); border-radius:9999px; background:var(--card);
+  margin-bottom:8px; }
+.experts-head .material-symbols-outlined { font-size:16px; color:var(--accent); }
+.experts-list { display:flex; flex-direction:column; }
+.expert-agent { border-top:1px solid var(--hairline); }
+.expert-agent:first-child { border-top:none; }
+.expert-agent-sum { list-style:none; display:flex; align-items:center; gap:10px; padding:9px 2px; cursor:pointer; }
+.expert-agent-sum::-webkit-details-marker { display:none; }
+.expert-agent-icon { flex:0 0 auto; width:30px; height:30px; border-radius:9px; color:#fff;
+  display:inline-flex; align-items:center; justify-content:center; font-size:18px;
+  font-variation-settings:'FILL' 1; }
+.expert-agent-label { flex:1; font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:13px; color:var(--ink); }
+.expert-agent-sum .chev { color:var(--muted); font-size:20px; transition:transform .2s; }
+.expert-agent[open] .chev { transform:rotate(180deg); }
+.expert-agent-body { padding:0 2px 12px 40px; display:flex; flex-direction:column; gap:8px; }
+.expert-hint { color:var(--faint); font-size:13px; font-style:italic; }
+
+/* Generate: pickable recipe ideas (before building the full widget) */
+.ideas { display:flex; flex-direction:column; gap:10px; }
+.idea { text-align:left; border:1px solid var(--hairline); border-radius:14px; background:var(--card);
+  padding:14px 16px; cursor:pointer; box-shadow:var(--shadow); }
+.idea:hover { border-color:var(--accent); transform:translateY(-1px); box-shadow:var(--shadow-2); }
+.idea-title { font-family:'EB Garamond',serif; font-size:19px; color:var(--ink); }
+.idea-blurb { color:var(--muted); font-size:14px; margin-top:3px; }
+
+/* Nutrition Calculator: answer the clarifying question + recalculate */
+.calc-clarify .cc-q { margin-bottom:8px; }
+.cc-row { display:flex; gap:8px; }
+.cc-input { flex:1; height:38px; padding:0 12px; border:1px solid var(--outline); border-radius:9999px;
+  background:var(--card); color:var(--ink); font:inherit; font-size:14px; outline:none; }
+.cc-input:focus { border-color:var(--accent); }
+.cc-go { flex:0 0 auto; height:38px; padding:0 16px; border:none; border-radius:9999px; background:var(--primary);
+  color:var(--on-primary); font-family:'Hanken Grotesk',sans-serif; font-weight:700; font-size:12px;
+  text-transform:uppercase; letter-spacing:.05em; cursor:pointer; }
+.cc-go:hover { filter:brightness(1.06); }
+
+/* Sticky composer: always within reach while a conversation is on screen */
+#v-chat .composer { position:sticky; bottom:14px; z-index:25; max-width:760px; margin-top:18px;
+  padding:8px; border-radius:9999px; background:var(--surface); box-shadow:0 6px 24px rgba(45,45,45,.10); }
+[data-theme="nocturnal"] #v-chat .composer { background:var(--surface);
+  box-shadow:0 6px 24px rgba(0,0,0,.35); }
+#v-chat .thread { margin-top:22px; }
+
+/* Toast (link copied, rescale errors, etc.) */
+.toast { position:fixed; left:50%; bottom:28px; transform:translateX(-50%) translateY(14px);
+  background:var(--ink); color:var(--surface);
+  padding:11px 18px; border-radius:9999px; font-family:'Hanken Grotesk',sans-serif; font-weight:600;
+  font-size:14px; box-shadow:var(--shadow-2); opacity:0; pointer-events:none; z-index:400;
+  transition:opacity .2s ease, transform .2s ease; }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }

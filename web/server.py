@@ -193,6 +193,47 @@ def api_build():
     return jsonify(reply)
 
 
+@app.post("/api/expert-review")
+def api_expert_review():
+    """Generate the kitchen-crew expert review for any recipe on demand (used for
+    recipes that don't already carry one, e.g. measured Chef recipes). Body:
+    {title, ingredients, steps?, nutrition?, units}."""
+    data = request.get_json(force=True, silent=True) or {}
+    return jsonify(companion.expert_review_for(
+        title=data.get("title", ""),
+        ingredients=data.get("ingredients") or [],
+        steps=data.get("steps") or [],
+        nutrition=data.get("nutrition") or None,
+        units=data.get("units", "metric"),
+    ))
+
+
+@app.post("/api/rescale")
+def api_rescale():
+    """Rescale a recipe to a new serving count (rewrites ingredient + step amounts;
+    per-serving nutrition unchanged). Body: {recipe, servings, units}."""
+    data = request.get_json(force=True, silent=True) or {}
+    return jsonify(companion.rescale_recipe(
+        recipe=data.get("recipe") or {},
+        servings=data.get("servings"),
+        units=data.get("units", "metric"),
+    ))
+
+
+@app.post("/api/recipe-ideas")
+def api_recipe_ideas():
+    """Recipe Lab "Generate" step 1: propose pickable recipe ideas before building.
+    Body: {targets, diets, course, query, units}."""
+    data = request.get_json(force=True, silent=True) or {}
+    return jsonify(companion.recipe_ideas(
+        targets=data.get("targets") or {},
+        diets=data.get("diets") or [],
+        course=data.get("course"),
+        query=data.get("query"),
+        units=data.get("units", "metric"),
+    ))
+
+
 @app.get("/api/insights")
 def api_insights():
     """Data for the About data-science section: model card + evaluation + the

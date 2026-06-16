@@ -297,28 +297,17 @@ function renderRecipe(r) {
     const img = document.createElement('img'); img.src = r.image_url; img.alt = r.title || ''; img.loading = 'lazy';
     img.onerror = () => ph.remove();
     ph.appendChild(img); card.appendChild(ph);
-  } else if (r.expert_review || r.nutrition_model) {  // generated: abstract header, no photo
-    const ab = el('div', 'recipe-abstract'); ab.innerHTML = '<span class="material-symbols-outlined">restaurant</span>';
-    card.appendChild(ab);
   }
   const head = el('div', 'recipe-head');
   head.appendChild(el('h3', '', r.title || 'Recipe'));
   const actions = el('div', 'recipe-actions');
-  let panel = null;
-  if (r.expert_review) {
-    panel = renderExpertReview(r.expert_review); panel.classList.add('hidden');
-    const erBtn = el('button', 'erbtn');
-    erBtn.innerHTML = '<span class="material-symbols-outlined">groups</span>Expert review<span class="material-symbols-outlined chev">expand_more</span>';
-    erBtn.onclick = (e) => { e.stopPropagation(); const open = !panel.classList.toggle('hidden'); erBtn.classList.toggle('on', open); };
-    actions.appendChild(erBtn);
-  }
+  actions.appendChild(shareRecipeBtn(r));
   actions.appendChild(addRecipeBtn(r));
   head.appendChild(actions);
   card.appendChild(head);
-  if (panel) card.appendChild(panel);
   if (r.intro) card.appendChild(el('p', 'intro', cv(r.intro)));
   const meta = el('div', 'meta');
-  if (r.servings) meta.appendChild(el('span', 'pill', `${r.servings} servings`));
+  if (r.servings) meta.appendChild(servingsStepper(r, card));
   if (r.total_time_min) meta.appendChild(el('span', 'pill', `${r.total_time_min} min`));
   if (r.course) meta.appendChild(el('span', 'pill', r.course));
   if (r.diet_tags) r.diet_tags.split(',').map(s => s.trim()).filter(Boolean).forEach(t => meta.appendChild(el('span', 'pill diet', t)));
@@ -334,6 +323,7 @@ function renderRecipe(r) {
   if (r.utensils && r.utensils.length) { left.appendChild(el('h4', 'sec', 'Utensils')); const u = el('ul', 'util'); r.utensils.forEach(x => u.appendChild(el('li', '', x))); left.appendChild(u); }
   if (r.nutrition) left.appendChild(renderNutrition(r.nutrition, r.measured));
   if (r.nutrition_model && !r.measured) left.appendChild(el('div', 'crosscheck', `Model cross-check: ~${Math.round(r.nutrition_model.calories)} kcal, ${Math.round(r.nutrition_model.protein_g)}g protein, ${Math.round(r.nutrition_model.carbs_g)}g carbs, ${Math.round(r.nutrition_model.fat_g)}g fat`));
+  left.appendChild(renderExpertsTool(r));  // "Consult the experts" tool, bottom-left
   cols.appendChild(left);
   if ((r.steps && r.steps.length) || r.tip) {
     const right = el('div', '');
@@ -345,33 +335,150 @@ function renderRecipe(r) {
   attachAskAbout(card);
   return card;
 }
-function renderExpertReview(er) {
-  const panel = el('div', 'expert-review');
-  const chipRow = (items, cls) => { const w = el('div', 'er-chips'); items.forEach(t => w.appendChild(el('span', 'er-chip' + (cls ? ' ' + cls : ''), t))); return w; };
-  const addRow = (color, name, content) => {
-    const row = el('div', 'expert-row');
-    const dot = el('span', 'expert-dot'); dot.style.background = color; row.appendChild(dot);
-    const txt = el('div', 'expert-txt'); txt.appendChild(el('b', '', name));
-    if (content) txt.appendChild(content);
-    row.appendChild(txt); panel.appendChild(row);
-  };
-  if (er.nutrition_note) addRow('#9e0027', 'Nutritionist', el('span', 'er-line', cv(er.nutrition_note)));
-  const ds = er.diet_safety || {};
-  const dw = el('div', '');
-  if (ds.diet_flags && ds.diet_flags.length) dw.appendChild(chipRow(ds.diet_flags, 'ok'));
-  if (ds.allergens && ds.allergens.length) dw.appendChild(chipRow(ds.allergens.map(a => '⚠ ' + a), 'warn'));
-  else dw.appendChild(el('span', 'er-line', 'No common allergens flagged.'));
-  if (ds.safety_note) dw.appendChild(el('span', 'er-line', cv(ds.safety_note)));
-  if (dw.children.length) addRow('#2a6f7f', 'Dietitian & Safety', dw);
-  const eq = er.equipment || {};
-  const ew = el('div', '');
-  if (eq.tools && eq.tools.length) ew.appendChild(chipRow(eq.tools, ''));
-  if (eq.substitutions && eq.substitutions.length) {
-    const ul = el('ul', 'er-swaps'); eq.substitutions.forEach(s => ul.appendChild(el('li', '', cv(String(s).replace(/->/g, '→'))))); ew.appendChild(ul);
+
+/* ---------- "Consult the experts" tool (per-agent dropdowns, on demand) ---------- */
+const EXPERT_AGENTS = [
+  { key: 'nutrition', icon: 'nutrition', color: '#c8862b', label: 'Nutritionist' },
+  { key: 'diet', icon: 'health_and_safety', color: '#2a6f7f', label: 'Dietitian & Safety' },
+  { key: 'equipment', icon: 'blender', color: '#6a4a8a', label: 'Equipment' },
+  { key: 'subs', icon: 'swap_horiz', color: '#b4501f', label: 'Substitutions' },
+];
+const _expertFetches = new WeakMap();  // recipe object -> in-flight promise (fetch once)
+function ensureExperts(r) {
+  if (r.expert_review) return Promise.resolve(r.expert_review);
+  let p = _expertFetches.get(r);
+  if (!p) {
+    p = fetch('/api/expert-review', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: r.title, ingredients: r.ingredients || [], steps: r.steps || [], nutrition: r.nutrition || null, units: state.units }) })
+      .then(res => res.json())
+      .then(d => { if (d && d.expert_review) { r.expert_review = d.expert_review; return d.expert_review; } throw new Error((d && d.error) || 'no_review'); });
+    _expertFetches.set(r, p);
   }
-  if (eq.note) ew.appendChild(el('span', 'er-line', cv(eq.note)));
-  if (ew.children.length) addRow('#b4501f', 'Equipment & Subs', ew);
-  return panel;
+  return p;
+}
+function renderExpertsTool(r) {
+  const tool = el('div', 'experts-tool');
+  const head = el('div', 'experts-head');
+  head.innerHTML = '<span class="material-symbols-outlined">groups</span>Consult the experts';
+  tool.appendChild(head);
+  const list = el('div', 'experts-list'); tool.appendChild(list);
+  const bodies = {};
+  EXPERT_AGENTS.forEach(a => {
+    const d = document.createElement('details'); d.className = 'expert-agent';
+    const sum = document.createElement('summary'); sum.className = 'expert-agent-sum';
+    const ic = el('span', 'expert-agent-icon material-symbols-outlined', a.icon); ic.style.background = a.color;
+    sum.appendChild(ic);
+    sum.appendChild(el('span', 'expert-agent-label', a.label));
+    sum.appendChild(el('span', 'chev material-symbols-outlined', 'expand_more'));
+    d.appendChild(sum);
+    const body = el('div', 'expert-agent-body'); d.appendChild(body); bodies[a.key] = body;
+    if (!r.expert_review) body.appendChild(el('div', 'expert-hint', 'Tap to consult.'));
+    d.addEventListener('toggle', () => {
+      if (!d.open || r.expert_review) return;
+      Object.values(bodies).forEach(b => { b.innerHTML = ''; });
+      body.appendChild(thinkingEl('Consulting...'));
+      ensureExperts(r).then(() => fillExperts(r, bodies))
+        .catch(() => { Object.values(bodies).forEach(b => { b.innerHTML = ''; b.appendChild(el('div', 'expert-hint', 'Could not reach the experts. Try again.')); }); });
+    });
+    list.appendChild(d);
+  });
+  if (r.expert_review) fillExperts(r, bodies);
+  return tool;
+}
+function fillExperts(r, bodies) {
+  const er = r.expert_review; if (!er) return;
+  const chipRow = (items, cls) => { const w = el('div', 'er-chips'); items.forEach(t => w.appendChild(el('span', 'er-chip' + (cls ? ' ' + cls : ''), t))); return w; };
+  const set = (body, fn) => { if (!body) return; body.innerHTML = ''; fn(body); };
+  set(bodies.nutrition, b => b.appendChild(el('div', 'er-line', cv(er.nutrition_note || 'No notes on the macros.'))));
+  const ds = er.diet_safety || {};
+  set(bodies.diet, b => {
+    if (ds.diet_flags && ds.diet_flags.length) b.appendChild(chipRow(ds.diet_flags, 'ok'));
+    if (ds.allergens && ds.allergens.length) b.appendChild(chipRow(ds.allergens.map(a => '⚠ ' + a), 'warn'));
+    else b.appendChild(el('div', 'er-line', 'No common allergens flagged.'));
+    if (ds.safety_note) b.appendChild(el('div', 'er-line', cv(ds.safety_note)));
+  });
+  const eq = er.equipment || {};
+  set(bodies.equipment, b => {
+    if (eq.tools && eq.tools.length) b.appendChild(chipRow(eq.tools, ''));
+    else b.appendChild(el('div', 'er-line', 'No special equipment needed.'));
+    if (eq.note) b.appendChild(el('div', 'er-line', cv(eq.note)));
+  });
+  set(bodies.subs, b => {
+    if (eq.substitutions && eq.substitutions.length) {
+      const ul = el('ul', 'er-swaps'); eq.substitutions.forEach(s => ul.appendChild(el('li', '', cv(String(s).replace(/->/g, '→'))))); b.appendChild(ul);
+    } else b.appendChild(el('div', 'er-line', 'No swaps suggested.'));
+  });
+}
+
+/* ---------- servings stepper (smart AI rescale, debounced to one call) ---------- */
+function servingsStepper(r, card) {
+  if (!(r.ingredients && r.ingredients.length)) return el('span', 'pill', `${r.servings} servings`);
+  const wrap = el('div', 'servings-step');
+  const dec = el('button', 'sv-btn'); dec.type = 'button'; dec.innerHTML = '<span class="material-symbols-outlined">remove</span>';
+  const lab = el('span', 'sv-num'); const inc = el('button', 'sv-btn'); inc.type = 'button'; inc.innerHTML = '<span class="material-symbols-outlined">add</span>';
+  wrap.appendChild(dec); wrap.appendChild(lab); wrap.appendChild(inc);
+  const base = r.servings; let target = r.servings, timer = null;
+  const draw = () => { lab.textContent = `${target} serving${target === 1 ? '' : 's'}`; dec.disabled = target <= 1; inc.disabled = target >= 99; };
+  const schedule = () => {
+    draw();
+    if (timer) clearTimeout(timer);
+    if (target === base) return;  // back to where we started; nothing to do
+    timer = setTimeout(() => doRescale(r, target, card, wrap), 800);  // one call after clicks settle
+  };
+  dec.onclick = () => { if (target > 1) { target--; schedule(); } };
+  inc.onclick = () => { if (target < 99) { target++; schedule(); } };
+  draw();
+  return wrap;
+}
+async function doRescale(r, servings, card, wrap) {
+  wrap.classList.add('loading');
+  const lab = wrap.querySelector('.sv-num'); const prev = lab.textContent; lab.textContent = 'Rescaling...';
+  try {
+    const d = await (await fetch('/api/rescale', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipe: { title: r.title, servings: r.servings, ingredients: r.ingredients, steps: r.steps }, servings, units: state.units }) })).json();
+    if (d.error || !d.ingredients) { lab.textContent = prev; wrap.classList.remove('loading'); toast('Could not rescale. Try again.'); return; }
+    r.servings = d.servings || servings; r.ingredients = d.ingredients;
+    if (d.steps && d.steps.length) r.steps = d.steps;
+    try { persist(); } catch (e) {}
+    card.replaceWith(renderRecipe(r));
+  } catch (e) { lab.textContent = prev; wrap.classList.remove('loading'); toast('Could not rescale. Try again.'); }
+}
+
+/* ---------- share a recipe as a self-contained link (recipe encoded in URL) ---------- */
+function shareRecipeBtn(r) {
+  const b = el('button', 'sharerec');
+  b.innerHTML = '<span class="material-symbols-outlined">ios_share</span>Share';
+  b.onclick = (e) => { e.stopPropagation(); shareRecipe(r); };
+  return b;
+}
+function encodeRecipe(obj) {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  let bin = ''; bytes.forEach(c => bin += String.fromCharCode(c));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeRecipe(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '=';
+  const bin = atob(s); const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+async function shareRecipe(r) {
+  const slim = {};
+  ['title', 'intro', 'servings', 'total_time_min', 'ingredients', 'steps', 'utensils', 'tip', 'nutrition', 'course', 'diet_tags', 'image_url', 'measured']
+    .forEach(k => { if (r[k] != null) slim[k] = r[k]; });
+  const url = location.origin + location.pathname + '#r=' + encodeRecipe(slim);
+  try { await navigator.clipboard.writeText(url); toast('Recipe link copied'); }
+  catch (e) { window.prompt('Copy this recipe link:', url); }
+}
+function handleShareHash() {
+  if (!location.hash.startsWith('#r=')) return;
+  try { const r = decodeRecipe(location.hash.slice(3)); if (r && r.title) openRecipeModal(r); } catch (e) {}
+  try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+}
+function toast(msg) {
+  let t = $('toast'); if (!t) { t = el('div', 'toast'); t.id = 'toast'; document.body.appendChild(t); }
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2600);
 }
 function renderNutrition(n, measured) {
   const wrap = el('div', 'nutri');
@@ -489,7 +596,17 @@ async function estimateMeal() {
     out.appendChild(renderNutrition(d.nutrition, false));
     const note = [d.basis, d.assumptions].filter(Boolean).join(' · ');
     if (note) out.appendChild(el('div', 'calc-note', note));
-    if (d.clarify) out.appendChild(el('div', 'calc-clarify', '💬 ' + d.clarify));
+    if (d.clarify) {
+      const cw = el('div', 'calc-clarify');
+      cw.appendChild(el('div', 'cc-q', '💬 ' + d.clarify));
+      const rowq = el('div', 'cc-row');
+      const inp = document.createElement('input'); inp.className = 'cc-input'; inp.placeholder = 'Add the detail and recalculate...';
+      const go = el('button', 'cc-go'); go.type = 'button'; go.textContent = 'Recalculate';
+      const submit = () => { const extra = inp.value.trim(); if (!extra) return; $('est-ingredients').value = text + ' (' + extra + ')'; estimateMeal(); };
+      go.onclick = submit; inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+      rowq.appendChild(inp); rowq.appendChild(go); cw.appendChild(rowq);
+      out.appendChild(cw);
+    }
     if (d.nutrition_model) out.appendChild(el('div', 'crosscheck', `Model cross-check: ~${Math.round(d.nutrition_model.calories)} kcal, ${Math.round(d.nutrition_model.protein_g)}g protein, ${Math.round(d.nutrition_model.carbs_g)}g carbs, ${Math.round(d.nutrition_model.fat_g)}g fat`));
   } catch (e) { out.textContent = 'Estimate failed. Try again.'; }
 }
@@ -524,7 +641,7 @@ async function labRun(mode) {
   const status = $('lab-status'), out = $('lab-results');
   const body = { targets: labTargets(), diets: labDiets(), course: $('lab-course').value, query: $('lab-query').value.trim(), units: state.units };
   out.innerHTML = ''; status.innerHTML = '';
-  status.appendChild(thinkingEl(mode === 'find' ? 'Finding chef recipes...' : 'Cooking up your recipe...'));
+  status.appendChild(thinkingEl(mode === 'find' ? 'Finding chef recipes...' : 'Dreaming up ideas...'));
   try {
     if (mode === 'find') {
       const d = await (await fetch('/api/search', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
@@ -532,12 +649,36 @@ async function labRun(mode) {
       status.textContent = hits.length ? `${hits.length} chef recipes matching your targets` : 'No matches. Try widening your targets or diets.';
       hits.forEach(h => out.appendChild(renderChefResult(h)));
     } else {
-      const d = await (await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
-      if (d.error || !d.recipe) { status.textContent = d.answer || 'Could not generate a recipe.'; return; }
-      status.textContent = 'Generated for you';
-      if (d.fit) out.appendChild(renderFit(d.fit));
-      out.appendChild(renderRecipe(d.recipe));
+      // Generate = propose pickable ideas first, then build the chosen one.
+      const d = await (await fetch('/api/recipe-ideas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+      const ideas = d.ideas || [];
+      if (d.error || !ideas.length) { status.textContent = d.error === 'no_key' ? 'Add an API key to generate.' : 'Could not come up with ideas. Try again.'; return; }
+      status.textContent = 'Pick an idea and I will build the full recipe';
+      out.appendChild(renderIdeas(ideas, body));
     }
+  } catch (e) { status.textContent = 'Something went wrong. Try again.'; }
+}
+function renderIdeas(ideas, baseBody) {
+  const wrap = el('div', 'ideas');
+  ideas.forEach(idea => {
+    const b = el('button', 'idea'); b.type = 'button';
+    b.appendChild(el('div', 'idea-title', idea.title));
+    if (idea.blurb) b.appendChild(el('div', 'idea-blurb', idea.blurb));
+    b.onclick = () => buildIdea(idea, baseBody);
+    wrap.appendChild(b);
+  });
+  return wrap;
+}
+async function buildIdea(idea, baseBody) {
+  const status = $('lab-status'), out = $('lab-results');
+  out.innerHTML = ''; status.innerHTML = ''; status.appendChild(thinkingEl(`Cooking up ${idea.title}...`));
+  const body = { ...baseBody, query: (idea.title + (idea.blurb ? '. ' + idea.blurb : '')).trim() };
+  try {
+    const d = await (await fetch('/api/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })).json();
+    if (d.error || !d.recipe) { status.textContent = d.answer || 'Could not generate a recipe.'; return; }
+    status.textContent = 'Generated for you';
+    if (d.fit) out.appendChild(renderFit(d.fit));
+    out.appendChild(renderRecipe(d.recipe));
   } catch (e) { status.textContent = 'Something went wrong. Try again.'; }
 }
 function renderFit(fit) {
@@ -633,4 +774,5 @@ if ($('send')) $('send').onclick = () => ask(qInput.value);
 if (qInput) qInput.addEventListener('keydown', e => { if (e.key === 'Enter') ask(qInput.value); });
 renderSessions();
 render();
+handleShareHash();  // if opened via a shared recipe link, show that recipe
 if (qInput) qInput.focus();

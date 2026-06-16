@@ -354,6 +354,201 @@ def build_macro_recipe(targets: dict | None = None, diets: list[str] | None = No
     return reply
 
 
+# The kitchen-crew review, on its own (for recipes that don't carry one yet).
+_EXPERT_SCHEMA = {
+    "type": "object",
+    "properties": _RECIPE_SCHEMA["properties"]["expert_review"]["properties"],
+    "required": ["nutrition_note", "diet_safety", "equipment"],
+    "additionalProperties": False,
+}
+
+_CREW_DIRECTIVE = (
+    "You are Su Chef's KITCHEN CREW reviewing a recipe. Fill expert_review with "
+    "SHORT, accurate notes (one line each, no fluff): nutrition_note = the "
+    "Nutritionist's qualitative read of the macros (e.g. \"Lean and high in protein, "
+    "light on carbs\"). diet_safety.diet_flags = diets this recipe actually satisfies "
+    "(e.g. Vegetarian, Gluten-Free, Vegan, Dairy-Free, Keto). diet_safety.allergens = "
+    "common allergens genuinely present, from {peanuts, tree nuts, dairy, eggs, "
+    "gluten, soy, shellfish, fish}; empty if none. diet_safety.safety_note = one "
+    "practical food-safety line (e.g. \"Cook chicken to 75C / 165F\"). equipment.tools "
+    "= key equipment needed. equipment.substitutions = handy swaps as \"X -> Y\". "
+    "equipment.note = one line. Be honest about allergens and diet compliance; never "
+    "claim a diet it does not meet. No em dashes.")
+
+
+def expert_review_for(title: str, ingredients: list[str] | None = None,
+                      steps: list[str] | None = None, nutrition: dict | None = None,
+                      units: str = "metric") -> dict:
+    """Generate the kitchen-crew expert_review for ANY recipe on demand (used when a
+    recipe, e.g. a measured Chef recipe, doesn't already carry one). Returns
+    {"expert_review": {...}} or {"error": ...}."""
+    key = _api_key()
+    if not key:
+        return {"error": "no_key"}
+    ings = [str(i) for i in (ingredients or [])]
+    facts = [f"Title: {title}".strip()]
+    if ings:
+        facts.append("Ingredients:\n" + "\n".join(f"- {i}" for i in ings))
+    if steps:
+        facts.append("Steps:\n" + "\n".join(f"{n}. {s}"
+                                            for n, s in enumerate(steps, 1)))
+    if nutrition and nutrition.get("calories"):
+        facts.append(f"Per-serving nutrition (measured/estimated): "
+                     f"{nutrition.get('calories')} kcal, "
+                     f"{nutrition.get('protein_g', '?')}g protein, "
+                     f"{nutrition.get('carbs_g', '?')}g carbs, "
+                     f"{nutrition.get('fat_g', '?')}g fat.")
+    system = (_CREW_DIRECTIVE + "\n\n" + _UNITS.get(units, _UNITS["metric"])
+              + "\n\nReview this recipe:")
+    import anthropic
+    client = anthropic.Anthropic(api_key=key)
+    try:
+        resp = client.messages.create(
+            model=MODEL, max_tokens=600, system=system,
+            messages=[{"role": "user", "content": "\n\n".join(facts)}],
+            output_config={"format": {"type": "json_schema", "schema": _EXPERT_SCHEMA}},
+        )
+        data = json.loads("".join(b.text for b in resp.content if b.type == "text"))
+    except Exception as exc:
+        return {"error": exc.__class__.__name__}
+    return {"expert_review": data}
+
+
+_RESCALE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "servings": {"type": "integer"},
+        "ingredients": {"type": "array", "items": {"type": "string"}},
+        "steps": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": ["servings", "ingredients"],
+    "additionalProperties": False,
+}
+
+
+def rescale_recipe(recipe: dict, servings: int, units: str = "metric") -> dict:
+    """Rescale a recipe to a new number of servings: rewrite ingredient amounts and
+    any amounts mentioned in the steps. Per-serving nutrition is unchanged, so we do
+    not touch it. Returns {"servings", "ingredients", "steps"} or {"error": ...}."""
+    key = _api_key()
+    if not key:
+        return {"error": "no_key"}
+    try:
+        target = max(1, int(servings))
+    except Exception:
+        return {"error": "bad_servings"}
+    recipe = recipe or {}
+    old = recipe.get("servings") or 0
+    ings = [str(i) for i in (recipe.get("ingredients") or [])]
+    steps = [str(s) for s in (recipe.get("steps") or [])]
+    if not ings:
+        return {"error": "no_ingredients"}
+    parts = [f"Recipe: {recipe.get('title', '')}".strip(),
+             f"Current servings: {old or 'unknown'}",
+             f"Rescale to: {target} servings",
+             "Ingredients:\n" + "\n".join(f"- {i}" for i in ings)]
+    if steps:
+        parts.append("Steps:\n" + "\n".join(f"{n}. {s}"
+                                            for n, s in enumerate(steps, 1)))
+    system = (
+        "You are Su Chef. Rescale this recipe to the requested number of servings. "
+        "Adjust the quantity in every ingredient line proportionally, and update any "
+        "amounts mentioned inside the steps (pan sizes, tin counts, batch language) so "
+        "they stay consistent. Keep the SAME ingredients, the same wording/order, and "
+        "the same number of steps; change only the amounts. Use sensible, cook-friendly "
+        "rounding (no '1.33 eggs' nonsense). Return servings = the new count, the full "
+        "rewritten ingredients list, and the full rewritten steps. No em dashes.\n\n"
+        + _UNITS.get(units, _UNITS["metric"]))
+    import anthropic
+    client = anthropic.Anthropic(api_key=key)
+    try:
+        resp = client.messages.create(
+            model=MODEL, max_tokens=1100, system=system,
+            messages=[{"role": "user", "content": "\n\n".join(parts)}],
+            output_config={"format": {"type": "json_schema", "schema": _RESCALE_SCHEMA}},
+        )
+        data = json.loads("".join(b.text for b in resp.content if b.type == "text"))
+    except Exception as exc:
+        return {"error": exc.__class__.__name__}
+    return {
+        "servings": data.get("servings") or target,
+        "ingredients": [str(i) for i in data.get("ingredients", [])] or ings,
+        "steps": [str(s) for s in data.get("steps", [])] or steps,
+    }
+
+
+_IDEAS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "ideas": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "blurb": {"type": "string"},
+                },
+                "required": ["title", "blurb"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["ideas"],
+    "additionalProperties": False,
+}
+
+
+def recipe_ideas(targets: dict | None = None, diets: list[str] | None = None,
+                 course: str | None = None, query: str | None = None,
+                 units: str = "metric") -> dict:
+    """Recipe Lab "Generate": propose 3-4 short recipe ideas (title + one-line blurb)
+    for the cook's targets/diets/course/query, so they can pick one before we build
+    the full recipe. Returns {"ideas": [{title, blurb}, ...]} or {"error": ...}."""
+    key = _api_key()
+    if not key:
+        return {"error": "no_key"}
+    targets = targets or {}
+    diets = diets or []
+    seed = (query or "").strip()
+    bits = []
+    if seed:
+        bits.append(f"theme/ingredient focus: {seed}")
+    if course and course != "Any":
+        bits.append(f"course: {course}")
+    if diets:
+        bits.append("must comply with diets: " + ", ".join(diets))
+    goal = []
+    for k, lab in (("calories", "kcal"), ("protein_g", "g protein"),
+                   ("carbs_g", "g carbs"), ("fat_g", "g fat")):
+        if targets.get(k):
+            goal.append(f"~{targets[k]} {lab}")
+    if goal:
+        bits.append("per-serving nutrition targets: " + ", ".join(goal))
+    user = ("Propose recipe ideas. " + ("; ".join(bits) if bits else "Cook's choice."))
+    system = (
+        "You are Su Chef. Propose 3-4 DISTINCT recipe ideas the cook could make for "
+        "the given constraints. Each idea: title = the dish name (short), blurb = ONE "
+        "tempting line (under 14 words) on what makes it good and how it fits the "
+        "targets/diets. Respect any diets strictly. Vary the ideas (different "
+        "proteins/cuisines/styles). Do not write full recipes. No em dashes.\n\n"
+        + _UNITS.get(units, _UNITS["metric"]))
+    import anthropic
+    client = anthropic.Anthropic(api_key=key)
+    try:
+        resp = client.messages.create(
+            model=MODEL, max_tokens=500, system=system,
+            messages=[{"role": "user", "content": user}],
+            output_config={"format": {"type": "json_schema", "schema": _IDEAS_SCHEMA}},
+        )
+        data = json.loads("".join(b.text for b in resp.content if b.type == "text"))
+    except Exception as exc:
+        return {"error": exc.__class__.__name__}
+    ideas = [{"title": str(i.get("title", "")).strip(),
+              "blurb": str(i.get("blurb", "")).strip()}
+             for i in data.get("ideas", []) if i.get("title")][:4]
+    return {"ideas": ideas}
+
+
 _CALC_SCHEMA = {
     "type": "object",
     "properties": {
