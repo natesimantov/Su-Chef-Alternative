@@ -120,14 +120,9 @@ NO_KEY_NOTICE = (
 
 
 def _api_key() -> str | None:
-    """Resolve the key from Streamlit secrets first, then the environment."""
-    try:
-        import streamlit as st
-
-        if "ANTHROPIC_API_KEY" in st.secrets:
-            return st.secrets["ANTHROPIC_API_KEY"]
-    except Exception:
-        pass
+    """Resolve the key from the environment. The Flask server injects it from
+    .streamlit/secrets.toml (or the host's env) at startup; the pipeline reads the
+    secrets file directly."""
     return os.environ.get("ANTHROPIC_API_KEY")
 
 
@@ -214,7 +209,7 @@ def _macro_fit(targets: dict, nut: dict | None) -> dict | None:
 
 
 def _format_recipe_text(r: dict) -> str:
-    """Render a structured recipe to plain text (for Streamlit / read-aloud)."""
+    """Render a structured recipe to plain text (for read-aloud / plain export)."""
     lines = [r.get("intro", ""), "", "Ingredients:"]
     lines += [f"- {i}" for i in r.get("ingredients", [])]
     if r.get("utensils"):

@@ -1,5 +1,5 @@
 # Runtime deps for the deployed Flask app (kept lean for Railway).
-# The Streamlit app + voice input (faster-whisper) live in requirements-dev.txt.
+# Pipeline + optional server-side voice input (faster-whisper) live in requirements-dev.txt.
 flask>=3.0
 anthropic>=0.40
 pandas>=2.0

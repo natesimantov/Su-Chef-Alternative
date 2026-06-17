@@ -75,7 +75,7 @@ class SuChefFlow(Flow[PipelineState]):
 
 def _load_key_into_env() -> None:
     """CrewAI/litellm needs ANTHROPIC_API_KEY in the environment; read it from
-    Streamlit secrets if it isn't already set."""
+    .streamlit/secrets.toml if it isn't already set."""
     import os
     if os.environ.get("ANTHROPIC_API_KEY"):
         return

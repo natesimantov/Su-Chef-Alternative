@@ -1,8 +1,9 @@
-"""Server-side speech-to-text for the Flask app (Streamlit-free).
+"""Server-side speech-to-text for the Flask app.
 
-`voice.py`'s transcription is wrapped in Streamlit's cache decorator, so the Flask
-server uses this light module instead: the same faster-whisper model, cached in a
-plain module global. Works in any browser because the client only records audio.
+A light wrapper around faster-whisper, cached in a plain module global. Optional:
+the live app primarily uses the browser's own speech recognition, and falls back to
+this server-side transcription only when available. Works in any browser because
+the client just records audio.
 """
 
 from __future__ import annotations

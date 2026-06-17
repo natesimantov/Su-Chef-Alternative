@@ -1,9 +1,8 @@
 """Su Chef — Flask web app (the final UI).
 
 A proper web app: this Flask server serves a single-page Warm Hearth frontend and
-exposes JSON/SSE API endpoints that wrap the SAME Python brain the Streamlit app
-uses (companion.py, rag.py, pipeline/tools.py, voice.py, artifacts/). One brain,
-two front ends. Run locally:  python web/server.py
+exposes JSON/SSE API endpoints that wrap the shared Python core (companion.py,
+rag.py, pipeline/tools.py, stt.py, artifacts/). Run locally:  python web/server.py
 """
 
 from __future__ import annotations
@@ -23,7 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 
 def _load_key() -> None:
-    """Put ANTHROPIC_API_KEY in the environment from Streamlit secrets if needed."""
+    """Put ANTHROPIC_API_KEY in the environment from .streamlit/secrets.toml if needed."""
     if os.environ.get("ANTHROPIC_API_KEY"):
         return
     secrets = ROOT / ".streamlit" / "secrets.toml"
