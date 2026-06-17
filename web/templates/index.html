@@ -23,7 +23,7 @@
       <div class="sidebar-head">
         <div class="brand" data-view="chat">Su&nbsp;Chef<span class="dot">.</span></div>
       </div>
-      <button class="lab-cta" id="labCta" data-view="lab" title="Recipe Lab — set calorie & macro targets, then find real chef recipes or generate a custom one that fits your goals">
+      <button class="lab-cta" id="labCta" data-view="lab" title="Recipe Lab: set calorie & macro targets, then find real chef recipes or generate a custom one that fits your goals">
         <span class="lab-cta-top"><span class="material-symbols-outlined">science</span>Recipe&nbsp;Lab<span class="newbadge">NEW</span></span>
         <span class="lab-cta-sub">Cook to your macros →</span>
       </button>
@@ -53,8 +53,13 @@
           <div id="thread" class="thread"></div>
           <div class="composer">
             <button id="mic" class="iconbtn" title="Tap to speak"><span class="material-symbols-outlined">mic</span></button>
-            <input id="q" type="text" placeholder='e.g. "out of buttermilk — what now?"' autocomplete="off" />
+            <input id="q" type="text" placeholder='e.g. "out of buttermilk, what now?"' autocomplete="off" />
             <button id="send" class="send">Ask</button>
+          </div>
+          <div class="grounding-note">
+            <span class="material-symbols-outlined">database</span>
+            <span>Grounded in 38,054 real recipes, the dataset our model learned from.</span>
+            <span class="material-symbols-outlined gn-info" tabindex="0" title="Before answering, Su Chef retrieves real recipes from our dataset (RAG) so answers stay grounded in real data, not guesses.">info</span>
           </div>
         </section>
 
@@ -146,19 +151,8 @@
           </div>
 
           <h2 class="about-h2">Meet the agents</h2>
-          <p class="about-body">A <b>kitchen crew</b> reviews every recipe you get, and a <b>data crew</b> (a CrewAI pipeline) built the nutrition model behind the app. Each is a team of focused agents.</p>
-          <div class="crew-label">Kitchen crew · reviews every recipe</div>
-          <div class="agents-grid">
-            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#9e0027">restaurant_menu</span>
-              <b>Head Chef</b><p>Composes the recipe and pulls the crew's notes together.</p></div>
-            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#c8862b">nutrition</span>
-              <b>Nutritionist</b><p>Reads the macros and how the dish fits your goals.</p></div>
-            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#2a6f7f">health_and_safety</span>
-              <b>Dietitian &amp; Safety</b><p>Flags diet fit, common allergens, and food-safety tips.</p></div>
-            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#6a4a8a">blender</span>
-              <b>Equipment &amp; Subs</b><p>Lists the tools you need and handy ingredient swaps.</p></div>
-          </div>
-          <div class="crew-label">Data crew · built the model (CrewAI pipeline)</div>
+          <p class="about-body">A <b>data crew</b>, a CrewAI pipeline of six agents in two crews, cleans the dataset and trains the nutrition model behind the app. A separate <b>kitchen crew</b> then reviews each recipe you get.</p>
+          <div class="crew-label">Data crew · the CrewAI agents that built the model</div>
           <div class="crew-label crew-sub">Crew 1 · Recipe Analyst</div>
           <div class="agents-grid">
             <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#9e0027">database</span>
@@ -176,6 +170,17 @@
               <b>Feature Engineer</b><p>Turns recipes into the features the model learns from.</p></div>
             <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#b4501f">model_training</span>
               <b>Model Trainer</b><p>Trains and compares nutrition models, then writes the model card.</p></div>
+          </div>
+          <div class="crew-label">Kitchen crew · reviews every recipe (a Claude product feature)</div>
+          <div class="agents-grid">
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#9e0027">restaurant_menu</span>
+              <b>Head Chef</b><p>Composes the recipe and pulls the crew's notes together.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#c8862b">nutrition</span>
+              <b>Nutritionist</b><p>Reads the macros and how the dish fits your goals.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#2a6f7f">health_and_safety</span>
+              <b>Dietitian &amp; Safety</b><p>Flags diet fit, common allergens, and food-safety tips.</p></div>
+            <div class="agent-card"><span class="agent-icon material-symbols-outlined" style="background:#6a4a8a">blender</span>
+              <b>Equipment &amp; Subs</b><p>Lists the tools you need and handy ingredient swaps.</p></div>
           </div>
 
           <div class="fineprint">

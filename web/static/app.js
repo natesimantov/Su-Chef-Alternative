@@ -221,7 +221,7 @@ async function ask(text) {
     a.recipe_suggestion = data.recipe_suggestion || ''; a.recipe = data.recipe || null;
     render(); syncCurrent(); speak(a.content);
   } catch (e) {
-    const a = state.messages[state.messages.length - 1]; a.pending = false; a.content = 'Connection hiccup — try again.'; render(); syncCurrent();
+    const a = state.messages[state.messages.length - 1]; a.pending = false; a.content = 'Connection hiccup, try again.'; render(); syncCurrent();
   }
   state.busy = false;
 }
@@ -322,7 +322,7 @@ function renderRecipe(r) {
   const ing = el('ul', 'ing'); (r.ingredients || []).forEach(i => ing.appendChild(el('li', '', cv(i)))); left.appendChild(ing);
   if (r.utensils && r.utensils.length) { left.appendChild(el('h4', 'sec', 'Utensils')); const u = el('ul', 'util'); r.utensils.forEach(x => u.appendChild(el('li', '', x))); left.appendChild(u); }
   if (r.nutrition) left.appendChild(renderNutrition(r.nutrition, r.measured));
-  if (r.nutrition_model && !r.measured) left.appendChild(el('div', 'crosscheck', `Model cross-check: ~${Math.round(r.nutrition_model.calories)} kcal, ${Math.round(r.nutrition_model.protein_g)}g protein, ${Math.round(r.nutrition_model.carbs_g)}g carbs, ${Math.round(r.nutrition_model.fat_g)}g fat`));
+  if (r.nutrition_model && !r.measured) left.appendChild(el('div', 'crosscheck', `Our trained model predicts: ~${Math.round(r.nutrition_model.calories)} kcal, ${Math.round(r.nutrition_model.protein_g)}g protein, ${Math.round(r.nutrition_model.carbs_g)}g carbs, ${Math.round(r.nutrition_model.fat_g)}g fat`));
   left.appendChild(renderExpertsTool(r));  // "Consult the experts" tool, bottom-left
   cols.appendChild(left);
   if ((r.steps && r.steps.length) || r.tip) {
@@ -607,7 +607,7 @@ async function estimateMeal() {
       rowq.appendChild(inp); rowq.appendChild(go); cw.appendChild(rowq);
       out.appendChild(cw);
     }
-    if (d.nutrition_model) out.appendChild(el('div', 'crosscheck', `Model cross-check: ~${Math.round(d.nutrition_model.calories)} kcal, ${Math.round(d.nutrition_model.protein_g)}g protein, ${Math.round(d.nutrition_model.carbs_g)}g carbs, ${Math.round(d.nutrition_model.fat_g)}g fat`));
+    if (d.nutrition_model) out.appendChild(el('div', 'crosscheck', `Our trained model predicts: ~${Math.round(d.nutrition_model.calories)} kcal, ${Math.round(d.nutrition_model.protein_g)}g protein, ${Math.round(d.nutrition_model.carbs_g)}g carbs, ${Math.round(d.nutrition_model.fat_g)}g fat`));
   } catch (e) { out.textContent = 'Estimate failed. Try again.'; }
 }
 function labTargets() {
