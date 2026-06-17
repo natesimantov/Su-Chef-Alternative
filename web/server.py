@@ -10,6 +10,10 @@ from __future__ import annotations
 
 import os
 import sys
+import threading
+import time
+from collections import defaultdict, deque
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request
@@ -59,6 +63,68 @@ def _no_store_html(resp):
     be fresh (the static files themselves are cache-busted by ?v=)."""
     if resp.mimetype == "text/html":
         resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+# --- Spend guardrails (defense-in-depth on top of the Console hard cap) --------
+# Only the Anthropic-billed endpoints are guarded; edge-tts, the local model, and
+# the dataset search are free and untouched. State is in-memory and per-process —
+# Railway runs a single instance here, so this is the real ceiling; if ever scaled
+# to multiple instances the cap becomes per-instance (fine for this use).
+_BILLED_PATHS = {
+    "/api/ask", "/api/build", "/api/expert-review", "/api/rescale",
+    "/api/recipe-ideas", "/api/calc-nutrition",
+}
+_DAILY_AI_CAP = int(os.environ.get("SU_CHEF_DAILY_AI_CAP", "500"))   # ~ well under $20
+_IP_PER_MIN = int(os.environ.get("SU_CHEF_IP_PER_MIN", "15"))        # anti-burst
+_guard_lock = threading.Lock()
+_day_key = ""          # current UTC date string
+_day_count = 0         # billed AI calls so far today
+_ip_hits: dict[str, deque] = defaultdict(deque)  # client IP -> recent timestamps
+
+_LIMIT_MSG = ("Su Chef has hit its safety limit on AI requests for now (a spending "
+              "guard to protect the project's budget). Please try again in a little "
+              "while.")
+
+
+def _client_ip() -> str:
+    fwd = request.headers.get("X-Forwarded-For", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.remote_addr or "?"
+
+
+@app.before_request
+def _spend_guard():
+    """Cap billed AI calls: a global per-day ceiling plus a per-IP burst throttle."""
+    if request.path not in _BILLED_PATHS:
+        return None
+    global _day_key, _day_count
+    now = time.time()
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    ip = _client_ip()
+    with _guard_lock:
+        if today != _day_key:           # new UTC day -> reset the daily counter
+            _day_key, _day_count = today, 0
+            _ip_hits.clear()
+        if _day_count >= _DAILY_AI_CAP:
+            return _limit_response()
+        hits = _ip_hits[ip]
+        while hits and now - hits[0] > 60:   # slide the 60s window
+            hits.popleft()
+        if len(hits) >= _IP_PER_MIN:
+            return _limit_response()
+        hits.append(now)
+        _day_count += 1
+    return None
+
+
+def _limit_response():
+    # Shaped so the existing frontend renders it cleanly: ask() reads `answer`,
+    # the lab/calc handlers read `error`.
+    resp = jsonify({"error": "rate_limited", "answer": _LIMIT_MSG,
+                    "follow_ups": [], "limit": True})
+    resp.status_code = 429
     return resp
 
 
