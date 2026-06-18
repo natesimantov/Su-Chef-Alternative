@@ -776,3 +776,12 @@ renderSessions();
 render();
 handleShareHash();  // if opened via a shared recipe link, show that recipe
 if (qInput) qInput.focus();
+
+/* ---------- visit counter (footer) ---------- */
+(async function showVisits() {
+  const el = $('visitCounter'); if (!el) return;
+  try {
+    const d = await (await fetch('/api/visits')).json();
+    if (d && typeof d.visits === 'number') el.textContent = `🍳 ${d.visits.toLocaleString()} visits and counting`;
+  } catch (e) { /* leave it empty if unavailable */ }
+})();

@@ -118,13 +118,21 @@ reads the key from `.streamlit/secrets.toml`.
 | Variable | Default | What it does |
 |---|---|---|
 | `ANTHROPIC_API_KEY` | — | Claude API key (env or `.streamlit/secrets.toml`) |
-| `SU_CHEF_MODEL` | `claude-sonnet-4-6` | Chat/recipe model |
+| `SU_CHEF_MODEL` | `claude-sonnet-4-6` | Model for recipe generation + expert reviews |
+| `SU_CHEF_MODEL_FAST` | `claude-haiku-4-5` | Model for the light calls (chat, calculator, ideas, rescale) |
 | `SU_CHEF_WHISPER_MODEL` | `base.en` | Optional server-side transcription model |
 | `SU_CHEF_DAILY_AI_CAP` | `500` | Spend guard: max billed AI calls per day |
 | `SU_CHEF_IP_PER_MIN` | `15` | Spend guard: max billed AI calls per IP per minute |
+| `SU_CHEF_VISITS_BASE` | `120` | Baseline for the footer visit counter (estimated pre-tracking visits) |
 
 ## Deploy
 Deployed on **Railway** from the `web/` app + the shared Python core and committed
 artifacts. The build is reproducible: seeded pipeline, committed artifacts, and
 pinned dependencies (`scikit-learn==1.7.2`, `joblib==1.5.2`) so the host loads the
 exact trained model.
+
+**Visit counter persistence:** the footer counter stores its count in
+`RAILWAY_VOLUME_MOUNT_PATH` if a Railway **volume** is attached (otherwise a local
+`data/` file that resets on each redeploy). Attach a volume once in the Railway
+dashboard to make the count grow durably; the displayed total is
+`SU_CHEF_VISITS_BASE` + visits counted since.

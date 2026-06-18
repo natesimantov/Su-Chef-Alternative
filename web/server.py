@@ -127,6 +127,52 @@ def _limit_response():
     return resp
 
 
+# --- Visit counter ------------------------------------------------------------
+# Displayed total = a configurable baseline (estimated pre-tracking visits, which
+# were never logged) + visits actually counted from here on. To make the counted
+# part survive redeploys, attach a Railway volume (Railway sets
+# RAILWAY_VOLUME_MOUNT_PATH and the count is stored there); otherwise it falls back
+# to a local data/ file that resets per deploy, so the number simply floors at the
+# baseline. One count per browser (cookie-gated), so refreshes don't inflate it.
+_VISITS_BASE = int(os.environ.get("SU_CHEF_VISITS_BASE", "120"))
+_VISITS_DIR = Path(os.environ.get("RAILWAY_VOLUME_MOUNT_PATH") or (ROOT / "data"))
+_VISITS_FILE = _VISITS_DIR / "visits.json"
+_visits_lock = threading.Lock()
+
+
+def _read_visits() -> int:
+    try:
+        import json
+        return int(json.loads(_VISITS_FILE.read_text(encoding="utf-8")).get("count", 0))
+    except Exception:
+        return 0
+
+
+def _write_visits(n: int) -> None:
+    try:
+        import json
+        _VISITS_DIR.mkdir(parents=True, exist_ok=True)
+        _VISITS_FILE.write_text(json.dumps({"count": n}), encoding="utf-8")
+    except Exception:
+        pass
+
+
+@app.get("/api/visits")
+def api_visits():
+    """Total visits (baseline + counted). Increments once per browser via a cookie."""
+    new_browser = not request.cookies.get("su_seen")
+    with _visits_lock:
+        n = _read_visits()
+        if new_browser:
+            n += 1
+            _write_visits(n)
+    resp = jsonify({"visits": _VISITS_BASE + n})
+    if new_browser:
+        resp.set_cookie("su_seen", "1", max_age=60 * 60 * 24 * 365,
+                        samesite="Lax")
+    return resp
+
+
 @app.route("/")
 def index():
     return render_template("index.html", asset_v=_asset_v())
