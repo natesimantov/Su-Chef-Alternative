@@ -21,6 +21,10 @@ import os
 import re
 
 MODEL = os.environ.get("SU_CHEF_MODEL", "claude-sonnet-4-6")
+# Lighter/faster/cheaper model for the simple calls (chat, calculator, ideas,
+# rescale). The quality-critical showpieces (recipe generation + expert reviews)
+# stay on MODEL (Sonnet). Override either via env to revert.
+MODEL_FAST = os.environ.get("SU_CHEF_MODEL_FAST", "claude-haiku-4-5")
 
 SYSTEM_PROMPT = (
     "You are Su Chef, a warm and knowledgeable cooking companion — like a friendly, "
@@ -458,7 +462,7 @@ def rescale_recipe(recipe: dict, servings: int, units: str = "metric") -> dict:
     client = anthropic.Anthropic(api_key=key)
     try:
         resp = client.messages.create(
-            model=MODEL, max_tokens=1100, system=system,
+            model=MODEL_FAST, max_tokens=1100, system=system,
             messages=[{"role": "user", "content": "\n\n".join(parts)}],
             output_config={"format": {"type": "json_schema", "schema": _RESCALE_SCHEMA}},
         )
@@ -531,7 +535,7 @@ def recipe_ideas(targets: dict | None = None, diets: list[str] | None = None,
     client = anthropic.Anthropic(api_key=key)
     try:
         resp = client.messages.create(
-            model=MODEL, max_tokens=500, system=system,
+            model=MODEL_FAST, max_tokens=500, system=system,
             messages=[{"role": "user", "content": user}],
             output_config={"format": {"type": "json_schema", "schema": _IDEAS_SCHEMA}},
         )
@@ -590,7 +594,7 @@ def calc_nutrition(text: str, units: str = "metric") -> dict:
         + _UNITS.get(units, _UNITS["metric"]))
     try:
         resp = client.messages.create(
-            model=MODEL, max_tokens=400, system=system,
+            model=MODEL_FAST, max_tokens=400, system=system,
             messages=[{"role": "user", "content": text}],
             output_config={"format": {"type": "json_schema", "schema": _CALC_SCHEMA}},
         )
@@ -628,7 +632,7 @@ def _ask_claude(messages: list[dict], key: str, units: str = "metric",
                "can tap the recipe button and get it in-app. Otherwise leave "
                "recipe_suggestion empty.")
     resp = client.messages.create(
-        model=MODEL,
+        model=MODEL_FAST,
         max_tokens=400,
         system=system,
         messages=[{"role": m["role"], "content": m["content"]} for m in messages],
